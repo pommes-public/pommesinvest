@@ -3,7 +3,7 @@
 ![Documentation Status](https://readthedocs.org/projects/pommesdispatch/badge/?version=latest)
 ![PyPI - License](https://img.shields.io/pypi/l/pommesdispatch)
 
-# pommesdispatch
+# pommesinvest
 
 **A bottom-up fundamental investment model for the German electricity sector**
 
@@ -14,7 +14,7 @@ Please navigate to the section of interest to find out more.
 * [Introduction](#introduction)
 * [Documentation](#documentation)
 * [Installation](#installation)
-    * [Setting up pommesdispatch](#setting-up-pommesdispatch)
+    * [Setting up pommesinvest](#setting-up-pommesinvest)
     * [Installing a solver](#installing-a-solver)
 * [Contributing](#contributing)
 * [Citing](#citing)
@@ -25,10 +25,11 @@ Please navigate to the section of interest to find out more.
 
 If you are interested in the data preparation routines used or investment modeling, please find more information here:
 - [pommesdata](https://github.com/pommes-public/pommesdata): A full-featured transparent data preparation routine from raw data to POMMES model inputs
-- pommesinvest: A multi-period integrated investment and dispatch model for the German power sector (upcoming).
+- [pommesdispatch](https://github.com/pommes-public/pommesdispatch): A bottom-up fundamental power market model for the German power sector.
 
 ### Purpose and model characterization
-The **dispatch variant** of the power market model *POMMES* `pommesdispatch` enables the user to simulate the **dispatch of backup power plants, storages as well as demand response units for the Federal Republic of Germany** for an arbitrary year or timeframe between 2017 and 2030. The dispatch of renewable power plants is exogeneously determined by normalized infeed time series and capacity values. The models' overall goal is to minimize power system costs occuring from wholesale markets whereby no network constraints are considered except for the existing bidding zone configuration used for modeling electricity exchange. Thus, the model purpose is to simulate **dispatch decisions** and the resulting **day-ahed market prices**. A brief categorization of the model is given in the following table. An extensive categorization can be found in the [model documentation]().
+The **invest variant** of the power market model *POMMES* `pommesinvest` enables the user to simulate the **investment into backup power plants, storages as well as demand response units for the Federal Republic of Germany** for long-term horizons (until 2045). The expansion of renewable power plants is exogeneously determined by expansion pathways as well as normalized infeed time series.
+The models' overall goal is to minimize power system costs occuring from wholesale markets whereby no network constraints are considered. Thus, the model purpose is to simulate **investment decisions** and the resulting **capacity mix**. A brief categorization of the model is given in the following table. An extensive categorization can be found in the [model documentation]().
 
 | **criterion** | **manifestation** |
 | ---- | ---- |
@@ -51,23 +52,23 @@ oemof community. Users not familiar with oemof.solph may find further informatio
 [oemof.solph documentation](https://oemof-solph.readthedocs.io/en/latest/readme.html).
 
 ## Documentation
-An extensive **[documentation of pommesdispatch](https://pommesdispatch.readthedocs.io/)** can be found on readthedocs. It contains a user's guide, a model categorization, some energy economic and technical background information, a complete model formulation as well as documentation of the model functions and classes. 
+An extensive **[documentation of pommesinvest](https://pommesinvest.readthedocs.io/)** can be found on readthedocs. It contains a user's guide, a model categorization, some energy economic and technical background information, a complete model formulation as well as documentation of the model functions and classes. 
 
 ## Installation
-To set up `pommesdispatch`, set up a virtual environment (e.g. using conda) or add the required packages to your python installation. Additionally, you have to install a solver in order to solve the mathematical optimization problem.
+To set up `pommesinvest`, set up a virtual environment (e.g. using conda) or add the required packages to your python installation. Additionally, you have to install a solver in order to solve the mathematical optimization problem.
 
-### Setting up pommesdispatch
-`pommesdispatch` is hosted on [PyPI](https://pypi.org/project/pommesdispatch/). 
+### Setting up pommesinvest
+`pommesinvest` is hosted on [PyPI](https://pypi.org/project/pommesinvest/). 
 To install it, please use the following command
 ```
-pip install pommesdispatch
+pip install pommesinvest
 ```
 
 If you want to contribute as a developer, you fist have to
 [fork](https://docs.github.com/en/get-started/quickstart/fork-a-repo>)
 it and then clone the repository, in order to copy the files locally by typing
 ```
-git clone https://github.com/your-github-username/pommesdispatch.git
+git clone https://github.com/your-github-username/pommesinvest.git
 ```
 After cloning the repository, you have to install the required dependencies.
 Make sure you have conda installed as a package manager.
@@ -81,18 +82,18 @@ conda env create -f environment.yml
 ```
 Activate your environment by typing
 ```
-conda activate pommes_dispatch
+conda activate pommesinvest
 ```
 
 ### Installing a solver
-In order to solve a `pommesdispatch` model instance, you need a solver installed. Please see [oemof.solph's information on solvers](https://github.com/oemof/oemof-solph#installing-a-solver). As a default, gurobi is used for `pommesdispatch` models. It is a commercial solver, but provides academic licenses, though, if this applies to you. Elsewhise, we recommend to use CBC as the solver oemof recommends. To test your solver and oemof.solph installation, again see information from [oemof.solph](https://github.com/oemof/oemof-solph#installation-test).
+In order to solve a `pommesinvest` model instance, you need a solver installed. Please see [oemof.solph's information on solvers](https://github.com/oemof/oemof-solph#installing-a-solver). As a default, gurobi is used for `pommesinvest` models. It is a commercial solver, but provides academic licenses, though, if this applies to you. Elsewhise, we recommend to use CBC as the solver oemof recommends. To test your solver and oemof.solph installation, again see information from [oemof.solph](https://github.com/oemof/oemof-solph#installation-test).
 
 ## Contributing
 Every kind of contribution or feedback is warmly welcome.<br>
-We use the [GitHub issue management](https://github.com/pommes-public/pommesdispatch/issues) as well as 
-[pull requests](https://github.com/pommes-public/pommesdispatch/pulls) for collaboration. We try to stick to the PEP8 coding standards.
+We use the [GitHub issue management](https://github.com/pommes-public/pommesinvest/issues) as well as 
+[pull requests](https://github.com/pommes-public/pommesinvest/pulls) for collaboration. We try to stick to the PEP8 coding standards.
 
-The following people have contributed in the following manner to `pommesdispatch`:
+The following people have contributed in the following manner to `pommesinvest`:
 
 | Name | Contribution | Status |
 | ---- | ---- | ---- |
@@ -110,18 +111,16 @@ The following people have contributed in the following manner to `pommesdispatch
 | Joachim Müller-Kirchenbauer | support & conceptualization<br>early-stage conceptualization, funding | supporter (university professor) |
 
 *Note: Not every single contribution is reflected in the current version of
-`pommesdispatch`. This is especially true for those marked as early-stage 
+`pommesinvest`. This is especially true for those marked as early-stage 
 contributions that may have been extended, altered or sometimes discarded. 
 Nonetheless, all people listed have made valuable contributions. The ones
 discarded might be re-integrated at some point in time.
-Dedicated contributions to `pommesdata` and `pommesinvest` are not included
+Dedicated contributions to `pommesdata` and `pommesdispatch` are not included
 in the list, but listed individually for these projects.*
 
 ## Citing
-A publication using and introducing `pommesdispatch` is currently in preparation.
-
-If you are using `pommesdispatch` for your own analyses, we recommend citing as:<br>
-*Kochems, J.; Werner, Y.; Giehl, J.; Grosse, B. et al. (2021): pommesdispatch. A bottom-up fundamental power market model for the German electricity sector. https://github.com/pommes-public/pommesdispatch, accessed YYYY-MM-DD.*
+If you are using `pommesinvest` for your own analyses, we recommend citing as:<br>
+*Kochems, J.; Werner, Y.; Giehl, J.; Grosse, B. et al. (2021): pommesinvest. A bottom-up fundamental power market model for the German electricity sector. https://github.com/pommes-public/pommesinvest, accessed YYYY-MM-DD.*
 
 We furthermore recommend naming the version tag or the commit hash used for the sake of transparency and reproducibility.
 
