@@ -1,9 +1,13 @@
-# Determine the model configuration
+from pommesinvest.model.investment_model import run_investment_model, add_args
+
+
+def create_default_config():
+    content = """# Determine the model configuration
 
 # 1) Set overall workflow control parameters
 control_parameters:
     rolling_horizon: False
-    aggregate_input: True
+    aggregate_input: False
     interest_rate: 0.02
     solver: "gurobi"
     fuel_cost_pathway: "NZE"
@@ -32,4 +36,18 @@ input_output_parameters:
 # 4) Set rolling (myopic) horizon parameters (optional)
 rolling_horizon_parameters:
     myopic_horizon_in_years: 4
-    overlap_in_years: 0
+    overlap_in_years: 0"""
+    with open("./config.yml", "w") as opf:
+        opf.write(content)
+
+
+def run_pommes_invest():
+    args = add_args()
+    if args.init:
+        create_default_config()
+        return
+    run_investment_model(args.file)
+
+
+if __name__ == "__main__":
+    run_pommes_invest()

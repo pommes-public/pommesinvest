@@ -33,7 +33,6 @@ or its data inputs.
 Input Data
 ----------
 Input data can be compiled using the ``pommesdata`` package.
-A precompiled version is distributed with the investment model.
 
 Installation requirements
 -------------------------
@@ -51,30 +50,190 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 """
 
 
-import time, calendar
-import logging
-import pandas as pd
-from matplotlib import pyplot as plt
-
+import calendar
+from functions_for_processing_of_outputs_invest import (
+    extract_model_results,
+    create_aggregated_energy_source_results,
+    create_aggregated_investment_results,
+    create_aggregated_investment_results_RH,
+    create_results_to_save,
+    draw_production_plot,
+    draw_investment_decisions_plot,
+    draw_investment_decisions_plot_RH,
+    draw_exo_investment_decisions_plot,
+    draw_decommissioning_plot,
+)
+from helper_functions_invest import years_between
+from functions_for_model_control_invest import (
+    determine_timeslices_RH,
+    add_further_constrs,
+    build_simple_model,
+    build_RH_model,
+    initial_states_RH,
+    solve_RH_model,
+    dump_es,
+    reconstruct_objective_value,
+)
+from oemof.tools import logger
 import oemof.solph as solph
+from matplotlib import pyplot as plt
+import argparse
+import logging
+import time
+
+import pandas as pd
+import yaml
 from oemof.solph import processing
 from oemof.solph import views
-from oemof.tools import logger
+from yaml.loader import SafeLoader
+
+from pommesinvest.model_funcs import model_control
+
+
+def run_investment_model(config_file="./config.yml"):
+    """
+    Run a pommesinvest model.
+
+    Read in config information from a yaml file, initialize and run a
+    investment model and process results.
+
+    Parameters
+    ----------
+    config_file: str
+        A file holding the necessary configuration information for
+        a pommesinvest model
+    """
+    # ---- MODEL CONFIGURATION ----
+
+    # Import model config from yaml config file
+    with open(config_file) as file:
+        config = yaml.load(file, Loader=SafeLoader)
+
+    im = model_control.InvestmentModel()
+    im.update_model_configuration(
+        config["control_parameters"],
+        config["time_parameters"],
+        config["input_output_parameters"],
+        nolog=True,
+    )
+
+    if im.rolling_horizon:
+        im.add_rolling_horizon_configuration(
+            config["rolling_horizon_parameters"], nolog=True
+        )
+
+    im.initialize_logging()
+    im.check_model_configuration()
+    im.show_configuration_log()
+
+    # ---- MODEL RUN ----
+
+    # Initialize model meta information and results DataFrames
+    model_meta = {
+        "overall_objective": 0,
+        "overall_time": 0,
+        "overall_solution_time": 0,
+    }
+    ts = time.gmtime()
+    investment_results = pd.DataFrame()
+    dispatch_results = pd.DataFrame()
+
+    # Model run for integral optimization horizon (simple model set up)
+    if not im.rolling_horizon:
+        im.build_simple_model()
+
+        if im.write_lp_file:
+            im.om.write(
+                f"{im.path_folder_output}pommesinvest_model.lp",
+                io_options={"symbolic_solver_labels": True},
+            )
+
+        im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
+        meta_results = processing.meta_results(im.om)
+
+        model_meta["overall_objective"] = meta_results["objective"]
+        model_meta["overall_solution_time"] += meta_results["solver"]["Time"]
+
+    # Model run for rolling horizon optimization
+    if im.rolling_horizon:
+        logging.info(
+            "Creating a LP optimization model for investment optimization\n"
+            "using a ROLLING HORIZON approach for model solution."
+        )
+
+        # Initialization of rolling horizon model run
+        iteration_results = {
+            "storages_initial": pd.DataFrame(),
+            "transformers_initial": pd.DataFrame(),
+            "model_results": {},
+            "dispatch_results": dispatch_results,
+            "investment_results": investment_results,
+        }
+
+        for counter in range(getattr(im, "amount_of_time_slices")):
+            # rebuild the EnergySystem in each iteration
+            im.build_rolling_horizon_model(counter, iteration_results)
+
+            # Solve rolling horizon model
+            im.solve_rolling_horizon_model(counter, iteration_results, model_meta)
+
+            # Get initial states for the next model run from results
+            im.retrieve_initial_states_rolling_horizon(iteration_results)
+
+        dispatch_results = iteration_results["dispatch_results"]
+        investment_results = iteration_results["investment_results"]
+
+    model_meta["overall_time"] = time.mktime(time.gmtime()) - time.mktime(ts)
+
+    # ---- MODEL RESULTS PROCESSING ----
+
+    model_control.show_meta_logging_info(model_meta)
+
+    if not im.rolling_horizon:
+        model_results = processing.results(im.om)
+
+        dispatch_results = views.node(model_results, "DE_bus_el")["sequences"]
+        investment_results = views.node(model_results, "DE_bus_el")["period_scalars"]
+
+    if im.save_investment_results:
+        investment_results.to_csv(
+            im.path_folder_output + getattr(im, "filename") + "_investment.csv",
+            sep=",",
+            decimal=".",
+        )
+
+    if im.save_production_results:
+        dispatch_results.to_csv(
+            im.path_folder_output + getattr(im, "filename") + "_production.csv",
+            sep=",",
+            decimal=".",
+        )
+
+
+def add_args():
+    """Add command line argument for config file"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-f",
+        "--file",
+        required=False,
+        default="./config.yml",
+        help="Specify input config file",
+    )
+    parser.add_argument(
+        "--init",
+        required=False,
+        action="store_true",
+        help="Automatically generate default config",
+    )
+    return parser.parse_args()
+
+
+#################################################################################################### OLD FROM DLR Gitlab ###########################################################################################################################
 
 # Import all functions necessary for a model run.
 # A complete enumeration of functions is used here, so it can be seen which functions are imported
-from functions_for_model_control_invest import determine_timeslices_RH, \
-    add_further_constrs, \
-    build_simple_model, build_RH_model, initial_states_RH, solve_RH_model, \
-    dump_es, reconstruct_objective_value
 
-from helper_functions_invest import years_between
-
-from functions_for_processing_of_outputs_invest import \
-    extract_model_results, create_aggregated_energy_source_results, create_aggregated_investment_results, \
-    create_aggregated_investment_results_RH, create_results_to_save, \
-    draw_production_plot, draw_investment_decisions_plot, draw_investment_decisions_plot_RH, \
-    draw_exo_investment_decisions_plot, draw_decommissioning_plot
 
 # %%
 
@@ -83,11 +242,9 @@ from functions_for_processing_of_outputs_invest import \
 ###############################################################################
 
 # %%
-
-### 1) Determine model configuration through control variables
-
+# 1) Determine model configuration through control variables
 # Set file version
-file_version = '_2050'
+file_version = "_2050"
 lignite_phase_out = 2038
 hardcoal_phase_out = 2038
 MaxInvest = True
@@ -96,12 +253,12 @@ MaxInvest = True
 RollingHorizon = True
 AggregateInput = True
 Europe = False
-solver = 'gurobi'
+solver = "gurobi"
 
-# Determine fuel and investment cost pathways (options: lower, middle, upper) 
+# Determine fuel and investment cost pathways (options: lower, middle, upper)
 # as well emission limits (options: BAU, 80_percent_linear, 95_percent_linear, 100_percent_linear, customized)
-fuel_cost_pathway = 'middle'
-investment_cost_pathway = 'middle'
+fuel_cost_pathway = "middle"
+investment_cost_pathway = "middle"
 
 # Interest rate and discounting
 # Important Note: By default, exclusively real cost values are applied, so no discounting is needed.
@@ -114,13 +271,13 @@ discount = False
 # options for approach: ['DIW', 'DLR', 'IER', 'TUD']
 # options for scenario: ['25', '50', '75']
 ActivateDemandResponse = False
-approach = 'DLR'
-scenario = '50'
+approach = "DLR"
+scenario = "50"
 
 # Control emissions limit (options: BAU, 80_percent_linear,
 # 95_percent_linear, 100_percent_linear)
 ActivateEmissionsLimit = False
-emission_pathway = '100_percent_linear'
+emission_pathway = "100_percent_linear"
 
 ActivateInvestmentBudgetLimit = False
 
@@ -142,26 +299,28 @@ SaveInvestmentDecisionsResults = True
 
 # %%
 
-### 2) Set model optimization time and frequency for simple model runs
+# 2) Set model optimization time and frequency for simple model runs
 
-# Define starting and end year of (overall) optimization run and define which 
+# Define starting and end year of (overall) optimization run and define which
 # frequency shall be used. (End year is included.)
 startyear = 2016
 endyear = 2036
-freq = '48H'  # for alternatives see dict below
+freq = "48H"  # for alternatives see dict below
 
 # Determine the number of timesteps per year (no leap year, leap year, multiplicator)
 # Multiplicator is used to adapt input data given for hourly timesteps
-freq_timesteps = {'60min': (8760, 8784, 1),
-                  '4H': (2190, 2196, 4),
-                  '8H': (1095, 1098, 8),
-                  '24H': (365, 366, 24),
-                  '36H': (244, 244, 36),
-                  '48H': (182, 183, 48),
-                  '72H': (122, 122, 72),
-                  '96H': (92, 92, 96),
-                  '120H': (73, 73, 120),
-                  '240H': (37, 37, 240)}[freq]
+freq_timesteps = {
+    "60min": (8760, 8784, 1),
+    "4H": (2190, 2196, 4),
+    "8H": (1095, 1098, 8),
+    "24H": (365, 366, 24),
+    "36H": (244, 244, 36),
+    "48H": (182, 183, 48),
+    "72H": (122, 122, 72),
+    "96H": (92, 92, 96),
+    "120H": (73, 73, 120),
+    "240H": (37, 37, 240),
+}[freq]
 
 # Multiplicator used for getting frequency adjusted input data
 # NOTE: Time shift (winter time CET / summer time CEST) is ignored
@@ -187,8 +346,8 @@ if RollingHorizon:
 
 # Create date strings including day, month and hour (used for the simulation)
 # Date strings respresent the start of the first year and the end of the last one
-starttime = str(startyear) + '-01-01 00:00:00'
-endtime = str(endyear) + '-12-31 23:00:00'
+starttime = str(startyear) + "-01-01 00:00:00"
+endtime = str(endyear) + "-12-31 23:00:00"
 
 # Get the current time and convert it to a human readable form
 # 08.12.2018, JK: time.localtime() is actually the one to be used in combination with time.mktime()
@@ -196,7 +355,7 @@ endtime = str(endyear) + '-12-31 23:00:00'
 ts = time.gmtime()
 # ts_2 = time.localtime()
 timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", ts)
-# 27.11.2018, CS: Calculate overall time and overall solution time 
+# 27.11.2018, CS: Calculate overall time and overall solution time
 overall_objective = 0
 overall_time = 0
 overall_solution_time = 0
@@ -206,90 +365,155 @@ optimization_timeframe = years_between(starttime, endtime) + 1
 
 # Create string amendments in such a way that strings can be used to be concatenated
 # to filenames indicating which model configuration has been considered
-basic_filename = 'invest_'
+basic_filename = "invest_"
 
 # This formulation is not really nice. Dicts don't work because keys must be unique.
 if not RollingHorizon:
-    RH = 'overall_'
-    horizon_overlap = ''
+    RH = "overall_"
+    horizon_overlap = ""
 else:
-    RH = 'myopic_'
-    horizon_overlap = str(myopic_horizon_in_years) + "years_" + str(overlap_in_timesteps) + "overlap_"
+    RH = "myopic_"
+    horizon_overlap = (
+        str(myopic_horizon_in_years) + "years_" + str(overlap_in_timesteps) + "overlap_"
+    )
 if AggregateInput:
-    Agg = 'clustered_'
+    Agg = "clustered_"
 else:
-    Agg = 'complete_'
+    Agg = "complete_"
 if not Europe:
-    EU = 'DE-only'
+    EU = "DE-only"
 else:
-    EU = 'EU'
+    EU = "EU"
 if MaxInvest:
-    max_inv = ''
+    max_inv = ""
 else:
-    max_inv = '_wo_invest_limits'
+    max_inv = "_wo_invest_limits"
 
 # Filename concatenates all infos relevant for the model run
 # (timestamp of model creation is no longer included)
 
 # filename = basic_filename + freq +"_" + RH + horizon_overlap + Agg + str(lignite_phase_out) + '_endyear' +str(endyear) + max_inv
-filename = basic_filename + "start-" + starttime[:10] + "_" + str(optimization_timeframe) + "-years_" + RH + Agg + EU
+filename = (
+    basic_filename
+    + "start-"
+    + starttime[:10]
+    + "_"
+    + str(optimization_timeframe)
+    + "-years_"
+    + RH
+    + Agg
+    + EU
+)
 
 # Initialize logger for logging information
 # NOTE: Created an additional path to store .log files
-logger.define_logging(logfile=filename + '.log')
+logger.define_logging(logfile=filename + ".log")
 
 # %%
 
-### 3) Set input data
+# 3) Set input data
 
-path_folder_input = './inputs/'
-path_folder_input_csv = '../data/Outputlisten_Test_Invest/'
+path_folder_input = "./inputs/"
+path_folder_input_csv = "../data/Outputlisten_Test_Invest/"
 
 # Use aggregated input data if respective control parameter is
 # set to True -> It is highly recommended to use aggregated input data
 if AggregateInput:
-    filename_min_max_timeseries = '4transformers_clustered_min_max_timeseries_' + 'BK' + str(
-        lignite_phase_out) + '_SK' + str(hardcoal_phase_out) + file_version + '_JK.csv'
+    filename_min_max_timeseries = (
+        "4transformers_clustered_min_max_timeseries_"
+        + "BK"
+        + str(lignite_phase_out)
+        + "_SK"
+        + str(hardcoal_phase_out)
+        + file_version
+        + "_JK.csv"
+    )
     # filename_min_max_timeseries = 'transformers_min_max_timeseries_clustered_2019-10-13.csv'
     if Europe:
-        filename_node_data = '4power_market_input_data_invest_new_annually_clustered_' + 'BK' + str(
-            lignite_phase_out) + '_SK' + str(hardcoal_phase_out) + file_version + '_JK.xlsx'
+        filename_node_data = (
+            "4power_market_input_data_invest_new_annually_clustered_"
+            + "BK"
+            + str(lignite_phase_out)
+            + "_SK"
+            + str(hardcoal_phase_out)
+            + file_version
+            + "_JK.xlsx"
+        )
         # filename_node_data= 'node_input_data_invest_clustered_2019-10-13.xlsx'
-        logging.info('Using the AGGREGATED POWER PLANT DATA SET for EUROPE')
+        logging.info("Using the AGGREGATED POWER PLANT DATA SET for EUROPE")
     else:
-        filename_node_data = '4power_market_input_data_invest_new_annually_clustered_' + 'BK' + str(
-            lignite_phase_out) + '_SK' + str(hardcoal_phase_out) + file_version + '_JK.xlsx'
+        filename_node_data = (
+            "4power_market_input_data_invest_new_annually_clustered_"
+            + "BK"
+            + str(lignite_phase_out)
+            + "_SK"
+            + str(hardcoal_phase_out)
+            + file_version
+            + "_JK.xlsx"
+        )
         # filename_node_data = 'node_input_data_invest_clustered_2019-10-13.xlsx'
-        logging.info('Using the AGGREGATED POWER PLANT DATA SET for Germany')
+        logging.info("Using the AGGREGATED POWER PLANT DATA SET for Germany")
 # NOTE: This will not be applicable for investment modelling and might as well be dropped
 else:
-    filename_min_max_timeseries = '4transformers_min_max_timeseries_' + 'BK' + str(
-        lignite_phase_out) + '_SK' + str(hardcoal_phase_out) + file_version + '_JK.csv'
+    filename_min_max_timeseries = (
+        "4transformers_min_max_timeseries_"
+        + "BK"
+        + str(lignite_phase_out)
+        + "_SK"
+        + str(hardcoal_phase_out)
+        + file_version
+        + "_JK.csv"
+    )
     # filename_min_max_timeseries = 'transformers_min_max_timeseries_complete_2019-10-13.csv'
     if Europe:
-        filename_node_data = '4power_market_input_data_invest_new_annually_' + 'BK' + str(
-            lignite_phase_out) + '_SK' + str(hardcoal_phase_out) + file_version + '_JK.xlsx'
+        filename_node_data = (
+            "4power_market_input_data_invest_new_annually_"
+            + "BK"
+            + str(lignite_phase_out)
+            + "_SK"
+            + str(hardcoal_phase_out)
+            + file_version
+            + "_JK.xlsx"
+        )
         # filename_node_data= 'node_input_data_invest_complete_2019-10-13.xlsx'
-        logging.info('Using the COMPLETE POWER PLANT DATA SET for EUROPE. \n'
-                     'Minimum power output constraint of (individual) \n'
-                     'transformers will be neglected.')
+        logging.info(
+            "Using the COMPLETE POWER PLANT DATA SET for EUROPE. \n"
+            "Minimum power output constraint of (individual) \n"
+            "transformers will be neglected."
+        )
     else:
-        filename_node_data = '4power_market_input_data_invest_new_annually_' + 'BK' + str(
-            lignite_phase_out) + '_SK' + str(hardcoal_phase_out) + file_version + '_JK.xlsx'
+        filename_node_data = (
+            "4power_market_input_data_invest_new_annually_"
+            + "BK"
+            + str(lignite_phase_out)
+            + "_SK"
+            + str(hardcoal_phase_out)
+            + file_version
+            + "_JK.xlsx"
+        )
         # filename_node_data = 'node_input_data_invest_complete_2019-10-13.xlsx'
-        logging.info('Using the COMPLETE POWER PLANT DATA SET for GERMANY. \n'
-                     'Minimum power output constraint of (individual) \n'
-                     'transformers will be neglected.')
+        logging.info(
+            "Using the COMPLETE POWER PLANT DATA SET for GERMANY. \n"
+            "Minimum power output constraint of (individual) \n"
+            "transformers will be neglected."
+        )
 
 # Input data containing timeseries information for nodes (except for cost data)
-filename_node_timeseries = '5node_timeseries_' + 'BK' + str(lignite_phase_out) + '_SK' + str(
-    hardcoal_phase_out) + file_version + '.csv'
+filename_node_timeseries = (
+    "5node_timeseries_"
+    + "BK"
+    + str(lignite_phase_out)
+    + "_SK"
+    + str(hardcoal_phase_out)
+    + file_version
+    + ".csv"
+)
 # filename_node_timeseries = 'node_timeseries_2019-10-13.csv'
 
 # Input data containing costs data
-filename_cost_data = '2power_market_input_data_complete_cost' + file_version + '.xlsx'
+filename_cost_data = "2power_market_input_data_complete_cost" + file_version + ".xlsx"
 # filename_cost_data = 'cost_input_data_invest_2019-10-13.xlsx'
-filename_cost_timeseries = '3cost_timeseries' + file_version + '_JK.csv'
+filename_cost_timeseries = "3cost_timeseries" + file_version + "_JK.csv"
 # filename_cost_timeseries = 'cost_timeseries_2019-10-13.csv'
 
 # Initialize an investment budget.
@@ -305,25 +529,32 @@ if ActivateInvestmentBudgetLimit:
         investment_budget = investment_budget_per_year * optimization_timeframe
 
 if ActivateDemandResponse:
-    logging.info('Using approach from {} for DEMAND RESPONSE modeling\n'
-                 'Considering a {}% scenario'.format(approach, scenario))
+    logging.info(
+        "Using approach from {} for DEMAND RESPONSE modeling\n"
+        "Considering a {}% scenario".format(approach, scenario)
+    )
 else:
-    logging.info('Running a model WITHOUT DEMAND RESPONSE')
+    logging.info("Running a model WITHOUT DEMAND RESPONSE")
 
 # %%
 
-### Calculate timeslice and model control information for Rolling horizon model runs
+# Calculate timeslice and model control information for Rolling horizon model runs
 
 if RollingHorizon:
     # Set amount of timeslices and determine timeslice lengths for every iteration
     # timeslice_length_dict has tuples as values: (timeslice_length_wo_overlap, timeslice_length_with_overlap)
-    timeseries_start, amount_of_timeslices, timeslice_length_dict \
-        = determine_timeslices_RH(starttime,
-                                  endtime,
-                                  freq,
-                                  freq_timesteps,
-                                  myopic_horizon_in_years,
-                                  overlap_in_timesteps)
+    (
+        timeseries_start,
+        amount_of_timeslices,
+        timeslice_length_dict,
+    ) = determine_timeslices_RH(
+        starttime,
+        endtime,
+        freq,
+        freq_timesteps,
+        myopic_horizon_in_years,
+        overlap_in_timesteps,
+    )
 
 # %%
 
@@ -333,47 +564,54 @@ if RollingHorizon:
 
 # %%
 
-### Model run for simple model set up
+# Model run for simple model set up
 
 if not RollingHorizon:
     # Build the mathematical optimization model and obtain var_costs
     # In addition to that, calculate exo commissioning cost and total de/commissioned capacity
     # See function definition for details
-    om, existing_storage_labels, new_built_storage_labels, \
-    total_exo_com_costs_df, total_exo_com_capacity_df, total_exo_decom_capacity_df \
-        = build_simple_model(path_folder_input,
-                             filename_node_data,
-                             filename_cost_data,
-                             filename_node_timeseries,
-                             filename_min_max_timeseries,
-                             filename_cost_timeseries,
-                             AggregateInput,
-                             startyear,
-                             endyear,
-                             MaxInvest,
-                             fuel_cost_pathway,
-                             investment_cost_pathway,
-                             starttime,
-                             endtime,
-                             freq,
-                             multiplicator,
-                             optimization_timeframe,
-                             IR=IR,
-                             discount=discount,
-                             ActivateEmissionsLimit=ActivateEmissionsLimit,
-                             emission_pathway=emission_pathway,
-                             ActivateInvestmentBudgetLimit=ActivateInvestmentBudgetLimit,
-                             investment_budget=investment_budget,
-                             ActivateDemandResponse=ActivateDemandResponse,
-                             approach=approach,
-                             scenario=scenario)
+    (
+        om,
+        existing_storage_labels,
+        new_built_storage_labels,
+        total_exo_com_costs_df,
+        total_exo_com_capacity_df,
+        total_exo_decom_capacity_df,
+    ) = build_simple_model(
+        path_folder_input,
+        filename_node_data,
+        filename_cost_data,
+        filename_node_timeseries,
+        filename_min_max_timeseries,
+        filename_cost_timeseries,
+        AggregateInput,
+        startyear,
+        endyear,
+        MaxInvest,
+        fuel_cost_pathway,
+        investment_cost_pathway,
+        starttime,
+        endtime,
+        freq,
+        multiplicator,
+        optimization_timeframe,
+        IR=IR,
+        discount=discount,
+        ActivateEmissionsLimit=ActivateEmissionsLimit,
+        emission_pathway=emission_pathway,
+        ActivateInvestmentBudgetLimit=ActivateInvestmentBudgetLimit,
+        investment_budget=investment_budget,
+        ActivateDemandResponse=ActivateDemandResponse,
+        approach=approach,
+        scenario=scenario,
+    )
 
     # Solve the problem using the given solver
-    om.solve(solver=solver, solve_kwargs={'tee': True})
+    om.solve(solver=solver, solve_kwargs={"tee": True})
 
     # Calculate overall objective and optimization time
     meta_results = processing.meta_results(om)
-    overall_solution_time += meta_results['solver']['Time']
+    overall_solution_time += meta_results["solver"]["Time"]
 
     # get the current time and calculate the overall time
     ts_2 = time.gmtime()
@@ -383,20 +621,22 @@ if not RollingHorizon:
 
     print("********************************************************")
     logging.info("Done!")
-    print('Overall solution time: {:.2f}'.format(overall_solution_time))
-    print('Overall time: {:.2f}'.format(overall_time))
+    print("Overall solution time: {:.2f}".format(overall_solution_time))
+    print("Overall time: {:.2f}".format(overall_time))
 
 # %%
 
-### Myopic optimization with rolling window: Run invest model
+# Myopic optimization with rolling window: Run invest model
 # NOTE: This is a quasi rolling horizon approach
 
 if RollingHorizon:
 
-    logging.info('Creating a LP optimization model for INVESTMENT optimization \n'
-                 'using a MYOPIC OPTIMIZATION ROLLING WINDOW approach for model solution.')
+    logging.info(
+        "Creating a LP optimization model for INVESTMENT optimization \n"
+        "using a MYOPIC OPTIMIZATION ROLLING WINDOW approach for model solution."
+    )
 
-    # Initialization of RH model run 
+    # Initialization of RH model run
     counter = 0
     transformers_init_df = pd.DataFrame()
     storages_init_df = pd.DataFrame()
@@ -414,73 +654,90 @@ if RollingHorizon:
         # capacity for each iteration.
         # In addition to that, calculate exo commissioning cost and total de/commissioned capacity
         # See function definitions for details
-        om, es, timeseries_start, new_built_transformer_labels, \
-        new_built_storage_labels, datetime_index, endo_exo_exist_df, \
-        endo_exo_exist_stor_df, existing_storage_labels, \
-        total_exo_com_costs_df_RH, total_exo_com_capacity_df_RH, total_exo_decom_capacity_df_RH \
-            = build_RH_model(path_folder_input,
-                             filename_node_data,
-                             filename_cost_data,
-                             filename_node_timeseries,
-                             filename_min_max_timeseries,
-                             filename_cost_timeseries,
-                             AggregateInput,
-                             fuel_cost_pathway,
-                             investment_cost_pathway,
-                             endyear,
-                             MaxInvest,
-                             myopic_horizon_in_years,
-                             timeseries_start,
-                             timeslice_length_with_overlap=timeslice_length_dict[counter][2],
-                             counter=counter,
-                             transformers_init_df=transformers_init_df,
-                             storages_init_df=storages_init_df,
-                             freq=freq,
-                             multiplicator=multiplicator,
-                             overlap_in_timesteps=overlap_in_timesteps,
-                             years_per_timeslice=timeslice_length_dict[counter][0],
-                             total_exo_com_costs_df_RH=total_exo_com_costs_df_RH,
-                             total_exo_com_capacity_df_RH=total_exo_com_capacity_df_RH,
-                             total_exo_decom_capacity_df_RH=total_exo_decom_capacity_df_RH,
-                             IR=IR,
-                             discount=discount,
-                             ActivateEmissionsLimit=ActivateEmissionsLimit,
-                             emission_pathway=emission_pathway,
-                             ActivateInvestmentBudgetLimit=ActivateInvestmentBudgetLimit,
-                             investment_budget=investment_budget,
-                             ActivateDemandResponse=ActivateDemandResponse,
-                             approach=approach,
-                             scenario=scenario
-                             )
+        (
+            om,
+            es,
+            timeseries_start,
+            new_built_transformer_labels,
+            new_built_storage_labels,
+            datetime_index,
+            endo_exo_exist_df,
+            endo_exo_exist_stor_df,
+            existing_storage_labels,
+            total_exo_com_costs_df_RH,
+            total_exo_com_capacity_df_RH,
+            total_exo_decom_capacity_df_RH,
+        ) = build_RH_model(
+            path_folder_input,
+            filename_node_data,
+            filename_cost_data,
+            filename_node_timeseries,
+            filename_min_max_timeseries,
+            filename_cost_timeseries,
+            AggregateInput,
+            fuel_cost_pathway,
+            investment_cost_pathway,
+            endyear,
+            MaxInvest,
+            myopic_horizon_in_years,
+            timeseries_start,
+            timeslice_length_with_overlap=timeslice_length_dict[counter][2],
+            counter=counter,
+            transformers_init_df=transformers_init_df,
+            storages_init_df=storages_init_df,
+            freq=freq,
+            multiplicator=multiplicator,
+            overlap_in_timesteps=overlap_in_timesteps,
+            years_per_timeslice=timeslice_length_dict[counter][0],
+            total_exo_com_costs_df_RH=total_exo_com_costs_df_RH,
+            total_exo_com_capacity_df_RH=total_exo_com_capacity_df_RH,
+            total_exo_decom_capacity_df_RH=total_exo_decom_capacity_df_RH,
+            IR=IR,
+            discount=discount,
+            ActivateEmissionsLimit=ActivateEmissionsLimit,
+            emission_pathway=emission_pathway,
+            ActivateInvestmentBudgetLimit=ActivateInvestmentBudgetLimit,
+            investment_budget=investment_budget,
+            ActivateDemandResponse=ActivateDemandResponse,
+            approach=approach,
+            scenario=scenario,
+        )
 
         # 14.05.2019, JK: Solve model and return results
-        om, results_sequences, results_scalars, \
-        overall_objective, overall_solution_time \
-            = solve_RH_model(om,
-                             datetime_index,
-                             counter,
-                             startyear,
-                             myopic_horizon_in_years,
-                             timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[counter][1],
-                             results_sequences=results_sequences,
-                             results_scalars=results_scalars,
-                             overall_objective=overall_objective,
-                             overall_solution_time=overall_solution_time,
-                             new_built_storage_labels=new_built_storage_labels,
-                             existing_storage_labels=existing_storage_labels,
-                             solver=solver)
+        (
+            om,
+            results_sequences,
+            results_scalars,
+            overall_objective,
+            overall_solution_time,
+        ) = solve_RH_model(
+            om,
+            datetime_index,
+            counter,
+            startyear,
+            myopic_horizon_in_years,
+            timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[counter][1],
+            results_sequences=results_sequences,
+            results_scalars=results_scalars,
+            overall_objective=overall_objective,
+            overall_solution_time=overall_solution_time,
+            new_built_storage_labels=new_built_storage_labels,
+            existing_storage_labels=existing_storage_labels,
+            solver=solver,
+        )
 
         # 14.05.2019, JK: Set initial states for the next model run
         # See function definition for details
-        transformers_init_df, storages_init_df = \
-            initial_states_RH(om,
-                              timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[counter][1],
-                              new_built_transformer_labels=new_built_transformer_labels,
-                              new_built_storage_labels=new_built_storage_labels,
-                              endo_exo_exist_df=endo_exo_exist_df,
-                              endo_exo_exist_stor_df=endo_exo_exist_stor_df)
+        transformers_init_df, storages_init_df = initial_states_RH(
+            om,
+            timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[counter][1],
+            new_built_transformer_labels=new_built_transformer_labels,
+            new_built_storage_labels=new_built_storage_labels,
+            endo_exo_exist_df=endo_exo_exist_df,
+            endo_exo_exist_stor_df=endo_exo_exist_stor_df,
+        )
 
-        # 05.06.2019, JK: To Do: Check whether this dump works properly or 
+        # 05.06.2019, JK: To Do: Check whether this dump works properly or
         # if objects are still kept in memory.
         if Dumps:
             # 17.05.2019, JK: Dump energy system including results
@@ -503,10 +760,12 @@ if RollingHorizon:
     #    ts_2 = time.localtime()
     overall_time = calendar.timegm(ts_2) - calendar.timegm(ts)
 
-    print('*************************************FINALLY DONE*************************************')
-    print('Overall objective value: {:,.0f}'.format(overall_objective))
-    print('Overall solution time: {:.2f}'.format(overall_solution_time))
-    print('Overall time: {:.2f}'.format(overall_time))
+    print(
+        "*************************************FINALLY DONE*************************************"
+    )
+    print("Overall objective value: {:,.0f}".format(overall_objective))
+    print("Overall solution time: {:.2f}".format(overall_solution_time))
+    print("Overall time: {:.2f}".format(overall_time))
 
 # %%
 
@@ -518,13 +777,13 @@ if RollingHorizon:
 
 # 15.05.2019, JK: Store results
 if not RollingHorizon:
-    results_scalars, results_sequences = extract_model_results(om,
-                                                               new_built_storage_labels,
-                                                               existing_storage_labels)
+    results_scalars, results_sequences = extract_model_results(
+        om, new_built_storage_labels, existing_storage_labels
+    )
 
 # %%
 
-### Create and visualize production schedule
+# Create and visualize production schedule
 
 # 16.05.2019, JK: Power contains the aggregated production results per energy source
 # as well as information on storage infeed and outfeed and load; see function definition for details
@@ -534,60 +793,80 @@ Power = create_aggregated_energy_source_results(results_sequences)
 if PlotProductionResults:
 
     # 16.05.2019, JK: Draw a stackplot of the production results
-    draw_production_plot(Power,
-                         Europe)
+    draw_production_plot(Power, Europe)
 
     if SaveProductionPlot:
         path = "./results/"
-        plt.savefig(path + filename + '_production.png', dpi=150, bbox_inches="tight")
+        plt.savefig(path + filename + "_production.png", dpi=150, bbox_inches="tight")
 
     plt.show()
 
 if SaveProductionResults:
     path = "./results/"
-    results_sequences.to_csv(path + filename + '_production.csv', sep=';', decimal=',', header=True)
+    results_sequences.to_csv(
+        path + filename + "_production.csv", sep=";", decimal=",", header=True
+    )
 
 # %%
 
-### Create and visualize investment decisions taken
+# Create and visualize investment decisions taken
 
 if not RollingHorizon:
-    Invest = create_aggregated_investment_results(results_scalars,
-                                                  starttime,
-                                                  grouping=grouping)
+    Invest = create_aggregated_investment_results(
+        results_scalars, starttime, grouping=grouping
+    )
 
-    print('Total exogenous commissioning costs: {:,.0f}'.format(total_exo_com_costs_df.sum().sum()))
-    print('Objective + Total exogenous commissioning costs: {:,.0f}'.format(
-        total_exo_com_costs_df.sum().sum() + meta_results['objective']))
+    print(
+        "Total exogenous commissioning costs: {:,.0f}".format(
+            total_exo_com_costs_df.sum().sum()
+        )
+    )
+    print(
+        "Objective + Total exogenous commissioning costs: {:,.0f}".format(
+            total_exo_com_costs_df.sum().sum() + meta_results["objective"]
+        )
+    )
 
-    results_to_save = create_results_to_save(meta_results["objective"],
-                                             total_exo_com_costs_df,
-                                             total_exo_com_capacity_df,
-                                             total_exo_decom_capacity_df,
-                                             overall_solution_time,
-                                             overall_time,
-                                             Invest)
+    results_to_save = create_results_to_save(
+        meta_results["objective"],
+        total_exo_com_costs_df,
+        total_exo_com_capacity_df,
+        total_exo_decom_capacity_df,
+        overall_solution_time,
+        overall_time,
+        Invest,
+    )
 
 else:
-    Cumulated_Invest, Invest \
-        = create_aggregated_investment_results_RH(results_scalars,
-                                                  amount_of_timeslices,
-                                                  timeslice_length_dict,
-                                                  starttime,
-                                                  freq,
-                                                  grouping=grouping)
+    Cumulated_Invest, Invest = create_aggregated_investment_results_RH(
+        results_scalars,
+        amount_of_timeslices,
+        timeslice_length_dict,
+        starttime,
+        freq,
+        grouping=grouping,
+    )
 
-    print('Total exogenous commissioning costs: {:,.0f}'.format(total_exo_com_costs_df_RH.sum().sum()))
-    print('Objective + Total exogenous commissioning costs: {:,.0f}'.format(
-        total_exo_com_costs_df_RH.sum().sum() + overall_objective))
+    print(
+        "Total exogenous commissioning costs: {:,.0f}".format(
+            total_exo_com_costs_df_RH.sum().sum()
+        )
+    )
+    print(
+        "Objective + Total exogenous commissioning costs: {:,.0f}".format(
+            total_exo_com_costs_df_RH.sum().sum() + overall_objective
+        )
+    )
 
-    results_to_save = create_results_to_save(overall_objective,
-                                             total_exo_com_costs_df_RH,
-                                             total_exo_com_capacity_df_RH,
-                                             total_exo_decom_capacity_df_RH,
-                                             overall_solution_time,
-                                             overall_time,
-                                             Invest)
+    results_to_save = create_results_to_save(
+        overall_objective,
+        total_exo_com_costs_df_RH,
+        total_exo_com_capacity_df_RH,
+        total_exo_decom_capacity_df_RH,
+        overall_solution_time,
+        overall_time,
+        Invest,
+    )
 
 # In the first place, only new installations are shown.
 # Later on, it seems reasonable to include decommissioning decisions as well
@@ -598,18 +877,20 @@ if PlotInvestmentDecisionsResults:
         draw_investment_decisions_plot(Invest)
         draw_exo_investment_decisions_plot(total_exo_com_capacity_df)
         draw_decommissioning_plot(total_exo_decom_capacity_df)
-        draw_investment_decisions_plot(results_to_save['net_commissioning'])
+        draw_investment_decisions_plot(results_to_save["net_commissioning"])
 
     else:
         draw_investment_decisions_plot_RH(Cumulated_Invest, Invest)
         draw_exo_investment_decisions_plot(total_exo_com_capacity_df_RH)
         draw_decommissioning_plot(total_exo_decom_capacity_df_RH)
-        draw_investment_decisions_plot(results_to_save['net_commissioning'])
+        draw_investment_decisions_plot(results_to_save["net_commissioning"])
 
     if SaveInvestmentDecisionsPlot:
         path = "./results/"
-        plt.savefig(path + filename + '_investments.png', dpi=150, bbox_inches="tight")
+        plt.savefig(path + filename + "_investments.png", dpi=150, bbox_inches="tight")
 
 if SaveInvestmentDecisionsResults:
     path = "./results/"
-    results_to_save.to_csv(path + filename + '_investments.csv', sep=';', decimal=',', header=True)
+    results_to_save.to_csv(
+        path + filename + "_investments.csv", sep=";", decimal=",", header=True
+    )
