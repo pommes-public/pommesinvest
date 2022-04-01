@@ -32,9 +32,7 @@ import oemof.solph as solph
 from pommesinvest.model_funcs.helpers import resample_timeseries, calc_annuity
 
 
-def load_input_data(
-    filename=None, path_folder_input="../data/Outputlisten/", countries=None
-):
+def load_input_data(filename=None, im=None):
     r"""Load input data from csv files.
 
     Parameters
@@ -42,25 +40,70 @@ def load_input_data(
     filename : :obj:`str`
         Name of CSV file containing data
 
-    path_folder_input : :obj:`str`
-        The path_folder_output where the input data is stored
-
-    countries : :obj:`list` of str
-        List of countries to be simulated
+    im : :class:`InvestmentModel`
+        The investment model that is considered
 
     Returns
     -------
     df : :class:`pandas.DataFrame`
         DataFrame containing information about nodes or time series.
     """
-    df = pd.read_csv(path_folder_input + filename + ".csv", index_col=0)
+    df = pd.DataFrame()
+    if not "_ts" in filename:
+        df = pd.read_csv(im.path_folder_input + filename + ".csv", index_col=0)
+    else:
+        df = load_time_series_data_slice(filename, im)
 
-    if "country" in df.columns and countries is not None:
-        df = df[df["country"].isin(countries)]
+    if "country" in df.columns and im.countries is not None:
+        df = df[df["country"].isin(im.countries)]
 
     if df.isna().any().any() and "_ts" in filename:
         print(f"Attention! Time series input data file " f"{filename} contains NaNs.")
         print(df.loc[df.isna().any(axis=1)])
+
+    return df
+
+
+def load_time_series_data_slice(filename=None, im=None):
+    """Load slice of input time series data from csv files.
+
+    Determine index range to read in from reading in index
+    separately.
+
+    Parameters
+    ----------
+    filename : :obj:`str`
+        Name of CSV file containing data
+
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+
+    Returns
+    -------
+    df : :class:`pandas.DataFrame`
+        DataFrame containing sliced time series.
+    """
+    ts_start = pd.read_csv(
+        im.path_folder_input + filename,
+        parse_dates=True,
+        index_col=0,
+        usecols=[0],
+    )
+    start_index = pd.Index(ts_start.index).get_loc(im.starttime)
+    timeseries_end = pd.Timestamp(im.endtime, im.freq)
+    end_index = pd.Index(ts_start.index).get_loc(
+        (timeseries_end + im.overlap_in_timesteps * timeseries_end.freq).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+    )
+
+    df = pd.read_csv(
+        im.path_folder_input + filename,
+        parse_dates=True,
+        index_col=0,
+        skiprows=range(1, start_index),
+        nrows=end_index - start_index + 1,
+    )
 
     return df
 
