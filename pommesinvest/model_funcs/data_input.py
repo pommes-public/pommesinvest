@@ -24,7 +24,6 @@ from pommesinvest.model_funcs.subroutines import (
     parse_input_sheets,
     create_buses,
     create_demand_response_units,
-    create_sinks,
     create_excess_sinks,
     create_transformers,
     create_storages,
@@ -37,111 +36,455 @@ from pommesinvest.model_funcs.subroutines import (
 from pommesinvest.model_funcs.helpers import convert_annual_limit, resample_timeseries
 
 # TODO: Adjust to investment model needs
-def parse_input_data(
-    path_folder_input,
-    AggregateInput,
-    countries,
-    fuel_cost_pathway="middle",
-    year=2017,
-    ActivateDemandResponse=False,
-    scenario="50",
-):
-    """Read in csv files and build oemof components
+def parse_input_data(investment_model):
+    r"""Read in csv files as DataFrames and store them in a dict
 
     Parameters
     ----------
-    path_folder_input : :obj:`str`
-        The path_folder_output where the input data is stored
+    investment_model : :class:`InvestmentModel`
+        The investment model that is considered
 
-    AggregateInput: :obj:`boolean`
-        boolean control variable indicating whether to use complete or aggregated
-        transformer input data set
-
-    countries : :obj:`list` of str
-        List of countries to be simulated
-
-    fuel_cost_pathway:  :obj:`str`
-       The chosen pathway for commodity cost scenarios (lower, middle, upper)
-
-    year: :obj:`str`
-        Reference year for pathways depending on starttime
-
-    ActivateDemandResponse : :obj:`boolean`
-        If True, demand response input data is read in
-
-    scenario : :obj:`str`
-        Demand response scenario to be modeled;
-        must be one of ['25', '50', '75'] whereby '25' is the lower,
-        i.e. rather pessimistic estimate
     Returns
     -------
     input_data: :obj:`dict` of :class:`pd.DataFrame`
         The input data given as a dict of DataFrames
         with component names as keys
     """
-    # save the input data in a dict; keys are names and values are DataFrames
-    files = {
+    buses = {
         "buses": "buses",
-        # 'links': 'links',
-        # 'links_ts': 'links_ts',
-        "sinks_excess": "sinks_excess",
-        "sinks_demand_el": "sinks_demand_el",
-        "sinks_demand_el_ts": "sinks_demand_el_ts" + "_complete",
-        "sources_shortage": "sources_shortage",
-        "sources_commodity": "sources_commodity",
-        # 'sources_renewables_fluc': 'sources_renewables_fluc',
-        # 'costs_fuel': 'costs_fuel_' + fuel_cost_pathway,
-        # 'costs_ramping': 'costs_ramping',
-        # 'costs_fixed',
-        # 'costs_carbon': 'costs_carbon',
-        # 'costs_market_values': 'costs_market_values',
-        # 'costs_operation': 'costs_operation',
-        # 'costs_operation_storages': 'costs_operation_storages',
-        "emission_limits": "emission_limits",
     }
 
-    add_files = {  #'sources_renewables': 'sources_renewables',
-        # 'sources_renewables_ts': 'sources_renewables_ts',
-        #'storages_el': 'storages_el',
-        # 'transformers': 'transformers',
-        # 'transformers_minload_ts': 'transformers_minload_ts',
-        # 'transformers_renewables': 'transformers_renewables',
-        # 'min_loads_dh': 'min_loads_dh',
-        # 'min_loads_ipp': 'min_loads_ipp',
-        # 'costs_operation_renewables': 'costs_operation_renewables'
+    components = {
+        "sinks_excess": "sinks_excess",
+        "sinks_demand_el": "sinks_demand_el",
+        "sources_shortage": "sources_shortage",
+        "sources_commodity": "sources_commodity",
+        "sources_renewables": "sources_renewables",
+        "storages_el": "storages_el",
+        "existing_transformers": "transformers",
+        "new_built_transformers": "new_built_transformers",
+    }
+
+    time_series = {
+        "sinks_demand_el_ts": "sinks_demand_el_ts",
+        "sources_renewables_ts": "sources_renewables_ts",
+        "transformers_minload_ts": "transformers_minload_ts",
+        "transformers_availability_ts": "transformers_availability_ts",
+        "costs_fuel": f"costs_fuel_{investment_model.fuel_cost_pathway}_nominal",
+        "costs_fuel_ts": "costs_fuel_ts",
+        "costs_emissions": f"costs_emissions_{investment_model.emissions_cost_pathway}"
+        + "_nominal",
+        "costs_emissions_ts": "costs_emissions_ts",
+        "costs_operation": "costs_operation_nominal",
+        "costs_operation_renewables": "costs_operation_renewables",
+        "costs_operation_storages": "costs_operation_storages_nominal",
+        "min_loads_dh": "min_loads_dh",
+        "min_loads_ipp": "min_loads_ipp",
+    }
+
+    other_files = {
+        "emission_limits": "emission_limits",
+        "min_max_load_margins": "min_max_load_margins",
     }
 
     # Optionally use aggregated transformer data instead
-    if AggregateInput:
-        add_files["transformers"] = "transformers_clustered"
+    if investment_model.aggregate_input:
+        components["transformers"] = "transformers_clustered"
 
-    # Addition: demand response units
-    if ActivateDemandResponse:
-        add_files["sinks_dr_el"] = "sinks_demand_response_el_" + scenario
-        add_files["sinks_dr_el_ts"] = (
-            "sinks_demand_response_el_ts_" + scenario + "_complete"
+    # Add demand response units
+    if investment_model.activate_demand_response:
+        components["sinks_dr_el"] = (
+            "sinks_demand_response_el_" + investment_model.demand_response_scenario
         )
-        add_files["sinks_dr_el_ava_pos_ts"] = (
-            "sinks_demand_response_el_ava_pos_ts_" + scenario + "_complete"
+        components["sinks_dr_el_ts"] = (
+            "sinks_demand_response_el_ts_" + investment_model.demand_response_scenario
         )
-        add_files["sinks_dr_el_ava_neg_ts"] = (
-            "sinks_demand_response_el_ava_neg_ts_" + scenario + "_complete"
+        components["sinks_dr_el_ava_pos_ts"] = (
+            "sinks_demand_response_el_ava_pos_ts_"
+            + investment_model.demand_response_scenario
+        )
+        components["sinks_dr_el_ava_neg_ts"] = (
+            "sinks_demand_response_el_ava_neg_ts_"
+            + investment_model.demand_response_scenario
         )
 
-    # Use dedicated 2030 data
-    if year == 2030:
-        add_files = {k: v + "" for k, v in add_files.items()}
+    # Combine all files
+    input_files = {**buses, **components, **time_series}
+    input_files = {**input_files, **other_files}
 
-    files = {**files, **add_files}
-
-    input_data = {
+    return {
         key: load_input_data(
-            filename=name, path_folder_input=path_folder_input, countries=countries
+            filename=name,
+            path_folder_input=investment_model.path_folder_input,
+            countries=investment_model.countries,
         )
-        for key, name in files.items()
+        for key, name in input_files.items()
     }
 
-    return input_data
+
+def resample_input_data(input_data, im):
+    """Adjust input data to investment model frequency
+
+    Parameters
+    ----------
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
+
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+    """
+    for key in input_data.keys():
+        if key in ["existing_transformers", "new_built_transformers"]:
+            input_data[key].loc[
+                :, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]
+            ] = (
+                input_data[key]
+                .loc[:, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]]
+                .mul(im.multiplicator)
+            )
+        elif key in ["storages_el", "new_built_storages_el"]:
+            input_data[key] = input_data[key].where(pd.notnull(input_data[key]), None)
+            input_data[key].loc[
+                :, ["max_storage_level", "min_storage_level", "nominal_storable_energy"]
+            ] = (
+                input_data[key]
+                .loc[
+                    :,
+                    [
+                        "max_storage_level",
+                        "min_storage_level",
+                        "nominal_storable_energy",
+                    ],
+                ]
+                .mul(im.multiplicator)
+            )
+        # TODO: Add actual timeseries resampling from below!
+        elif "_ts" in key:
+            input_data[key] = resample_timeseries(
+                input_data[key], freq=im.freq, aggregation_rule="sum"
+            )
+
+        # Parse index column only in order to determine start and end point for values to parse (via index)
+    node_start = pd.read_csv(
+        path_folder_input_csv + filename_node_timeseries,
+        parse_dates=True,
+        index_col=0,
+        usecols=[0],
+    )
+    start = pd.Index(node_start.index).get_loc(starttime)
+    timeseries_end = pd.Timestamp(endtime, freq)
+    end = pd.Index(node_start.index).get_loc(
+        (timeseries_end + overlap_in_timesteps * timeseries_end.freq).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+    )
+
+    node_timeseries_df = resample_timeseries(
+        pd.read_csv(
+            path_folder_input_csv + filename_node_timeseries,
+            parse_dates=True,
+            index_col=0,
+            skiprows=range(1, start + 1),
+            nrows=end - start + 1,
+        ),
+        freq,
+        aggregation_rule="sum",
+    )
+
+    # Commissions / decommissions only happen on an annual basis
+    # (slice year, month and date (20XX-01-01))
+    min_max_start = pd.read_csv(
+        path_folder_input_csv + filename_min_max_timeseries,
+        parse_dates=True,
+        index_col=0,
+        usecols=[0],
+    )
+    start = pd.Index(min_max_start.index).get_loc(starttime[:10])[0]
+    timeseries_end = pd.Timestamp(endtime, freq)
+    end = pd.Index(min_max_start.index).get_loc(
+        str((timeseries_end + overlap_in_timesteps * timeseries_end.freq).year + 1)
+        + "-01-01"
+    )[0]
+
+    # Workaround used here: Fillna using ffill and delete last value not needed anymore
+    min_max_timeseries_df = resample_timeseries(
+        pd.read_csv(
+            path_folder_input_csv + filename_min_max_timeseries,
+            parse_dates=True,
+            index_col=0,
+            header=[0, 1],
+            skiprows=range(2, start + 1),
+            nrows=end - start + 1,
+        )
+        .resample("H")
+        .fillna(method="ffill")[:-1],
+        freq,
+        aggregation_rule="sum",
+    )
+
+
+# TODO: Integrate into clean read in and split!
+def parse_input_sheets(
+    path_folder_input,
+    filename_node_data,
+    filename_cost_data,
+    filename_node_timeseries,
+    filename_min_max_timeseries,
+    filename_cost_timeseries,
+    fuel_cost_pathway,
+    investment_cost_pathway,
+    starttime,
+    endtime,
+    freq="24H",
+    multiplicator=24,
+    overlap_in_timesteps=0,
+):
+    """Method used to parse the input sheets used to create oemof elements from the
+    input Excel workbook(s).
+
+    Since parsing the complete sheets and slicing is too time consuming for
+    timeseries data sheets, only the number of rows ranging from starttime
+    to endtime will be parsed. Therefore, the starting and endpoint have to
+    be determined.
+
+    Parameters
+    ----------
+    path_folder_input : :obj:`str`
+        The file path where input files are stored (common folder)
+
+    filename_node_data : :obj:`str`
+        Name of Excel Workbook containing all data for creating nodes (buses and oemof components)
+
+    filename_cost_data : :obj:`str`
+        Name of Excel Workbook containing cost pathways for oemof components
+
+    filename_node_timeseries : :obj:`str`
+       Filename of the node timeseries data, given in a separate .csv file
+
+    filename_min_max_timeseries  : :obj:`str`
+       Filename of the min / max transformer data, given in a separate .csv file
+
+    filename_cost_timeseries : :obj:`str`
+       Filename of the cost timeseries data, given in a separate .csv file
+
+    fuel_cost_pathway : :obj:`str`
+        variable indicating which fuel cost pathway to use
+        Possible values 'lower', 'middle', 'upper'
+
+    investment_cost_pathway : :obj:`str`
+        variable indicating which investment cost pathway to use
+        Possible values 'lower', 'middle', 'upper'
+
+    starttime : :obj:`str`
+        The starting timestamp of the optimization timeframe
+
+    endtime : :obj:`str`
+        The end timestamp of the optimization timeframe
+
+    freq : :obj:`string`
+        A string defining the timeseries target frequency; determined by the
+        model configuration
+
+    multiplicator : :obj:`int`
+        A multiplicator to convert the input data given with an hourly resolution
+        to another (usually a lower) one
+
+    overlap_in_timesteps : :obj:`int`
+        the overlap in timesteps if a rolling horizon model is run
+        (to prevent index out of bounds error)
+
+    Returns
+    -------
+    All component DataFrames (i.e. buses, transformerns, renewables, demand,
+    storages, commodity_sources and timeseries data) with its parameters
+    obtained from the input Excel workbook
+
+    """
+
+    # manually set input path for change to csv files
+    path_folder_input_csv = "../data/Outputlisten_Test_Invest/"
+
+    # Read in node Excel file and parse its spreadsheets to pd.DataFrames
+    xls_node = pd.ExcelFile(path_folder_input + filename_node_data)
+    "here change for buses to from csv!!!"
+
+    # Parse index column only in order to determine start and end point for values to parse (via index)
+    node_start = pd.read_csv(
+        path_folder_input_csv + filename_node_timeseries,
+        parse_dates=True,
+        index_col=0,
+        usecols=[0],
+    )
+    start = pd.Index(node_start.index).get_loc(starttime)
+    timeseries_end = pd.Timestamp(endtime, freq)
+    end = pd.Index(node_start.index).get_loc(
+        (timeseries_end + overlap_in_timesteps * timeseries_end.freq).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+    )
+
+    node_timeseries_df = resample_timeseries(
+        pd.read_csv(
+            path_folder_input_csv + filename_node_timeseries,
+            parse_dates=True,
+            index_col=0,
+            skiprows=range(1, start + 1),
+            nrows=end - start + 1,
+        ),
+        freq,
+        aggregation_rule="sum",
+    )
+
+    # Commissions / decommissions only happen on an annual basis
+    # (slice year, month and date (20XX-01-01))
+    min_max_start = pd.read_csv(
+        path_folder_input_csv + filename_min_max_timeseries,
+        parse_dates=True,
+        index_col=0,
+        usecols=[0],
+    )
+    start = pd.Index(min_max_start.index).get_loc(starttime[:10])[0]
+    timeseries_end = pd.Timestamp(endtime, freq)
+    end = pd.Index(min_max_start.index).get_loc(
+        str((timeseries_end + overlap_in_timesteps * timeseries_end.freq).year + 1)
+        + "-01-01"
+    )[0]
+
+    # Workaround used here: Fillna using ffill and delete last value not needed anymore
+    min_max_timeseries_df = resample_timeseries(
+        pd.read_csv(
+            path_folder_input_csv + filename_min_max_timeseries,
+            parse_dates=True,
+            index_col=0,
+            header=[0, 1],
+            skiprows=range(2, start + 1),
+            nrows=end - start + 1,
+        )
+        .resample("H")
+        .fillna(method="ffill")[:-1],
+        freq,
+        aggregation_rule="sum",
+    )
+
+    # Read in cost Excel file  and parse its spreadsheets to pd.DataFrames
+    """new import of cost via csv"""
+
+    # xls_cost = pd.ExcelFile(path_folder_input + filename_cost_data)
+
+    fuel_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_fuel" + ".csv", index_col=0
+    )
+    # fuel_costs_df = xls_cost.parse(fuel_cost_pathway + '_fuel_costs', index_col=0)
+    operation_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_operation" + ".csv", index_col=0
+    )
+    # operation_costs_df = xls_cost.parse('operation_costs', index_col=0)
+    ramping_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_ramping" + ".csv", index_col=0
+    )
+    # ramping_costs_df = xls_cost.parse('ramping_costs', index_col=0)
+    startup_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_startup" + ".csv", index_col=0
+    )
+    startup_costs_df.columns[1 : len((startup_costs_df.columns))].astype(int)
+    # startup_costs_df = xls_cost.parse('startup_costs', index_col=0)
+    storage_var_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_operation_storages" + ".csv", index_col=0
+    )
+    storage_var_costs_df.columns = storage_var_costs_df.columns.astype(int)
+    # storage_var_costs_df = xls_cost.parse('storage_var_costs', index_col=0)
+
+    investment_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_invest" + ".csv", index_col=0
+    )
+    investment_costs_df.columns = investment_costs_df.columns.astype(int)
+    # investment_costs_df = xls_cost.parse(investment_cost_pathway + '_investment_costs', index_col=0)
+    storage_investment_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_invest_storage" + ".csv", index_col=0
+    )
+    storage_investment_costs_df.columns = storage_investment_costs_df.columns.astype(
+        int
+    )
+    # storage_investment_costs_df = xls_cost.parse('storage_inv_costs', index_col=0)
+    storage_pump_investment_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_invest_storage_pump" + ".csv", index_col=0
+    )
+    storage_pump_investment_costs_df.columns = (
+        storage_pump_investment_costs_df.columns.astype(int)
+    )
+    # storage_pump_investment_costs_df = xls_cost.parse('storage_pump_inv_costs', index_col=0)
+    storage_turbine_investment_costs_df = pd.read_csv(
+        path_folder_input_csv + "costs_invest_storage_pump" + ".csv", index_col=0
+    )
+    storage_turbine_investment_costs_df.columns = (
+        storage_turbine_investment_costs_df.columns.astype(int)
+    )
+    # storage_turbine_investment_costs_df = xls_cost.parse('storage_turbine_inv_costs', index_col=0)
+    WACC_df = pd.read_csv(path_folder_input_csv + "WACC" + ".csv", index_col=0)
+    WACC_df.columns = WACC_df.columns.astype(int)
+    # WACC_df = xls_cost.parse('WACC', index_col=0)
+
+    # Parse index column only in order to determine start and end point for values to parse (via index)
+    # NOTE: If node and cost data have the same starting point and frequency,
+    # this becomes obsolete and fastens up parsing of input data
+    cost_start = pd.read_csv(
+        path_folder_input_csv + filename_cost_timeseries,
+        parse_dates=True,
+        index_col=0,
+        usecols=[0],
+    )
+    start = pd.Index(cost_start.index).get_loc(starttime[:10])
+    timeseries_end = pd.Timestamp(endtime, freq)
+    end = pd.Index(cost_start.index).get_loc(
+        str((timeseries_end + overlap_in_timesteps * timeseries_end.freq).year + 1)
+        + "-01-01"
+    )
+
+    # Workaround used here: Fillna using ffill and
+    # delete last value not needed anymore
+    cost_timeseries_df = (
+        pd.read_csv(
+            path_folder_input_csv + filename_cost_timeseries,
+            parse_dates=True,
+            index_col=0,
+            header=[0, 1],
+            skiprows=range(2, start + 1),
+            nrows=end - start + 1,
+        )
+        .resample(freq)
+        .fillna(method="ffill")[:-1]
+    )
+
+    # TODO, JK/YW: Introduce a dict of DataFrames for better handling
+    return (
+        buses_df,
+        excess_df,
+        shortage_df,
+        commodity_sources_df,
+        existing_transformers_df,
+        new_built_transformers_df,
+        renewables_df,
+        demand_df,
+        existing_storages_df,
+        new_built_storages_df,
+        existing_transformers_decom_df,
+        new_transformers_de_com_df,
+        renewables_com_df,
+        node_timeseries_df,
+        min_max_timeseries_df,
+        fuel_costs_df,
+        operation_costs_df,
+        ramping_costs_df,
+        startup_costs_df,
+        storage_var_costs_df,
+        investment_costs_df,
+        storage_investment_costs_df,
+        storage_pump_investment_costs_df,
+        storage_turbine_investment_costs_df,
+        WACC_df,
+        cost_timeseries_df,
+    )
 
 
 def add_limits(

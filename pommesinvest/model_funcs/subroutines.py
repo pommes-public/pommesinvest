@@ -65,364 +65,6 @@ def load_input_data(
     return df
 
 
-def parse_input_sheets(
-    path_folder_input,
-    filename_node_data,
-    filename_cost_data,
-    filename_node_timeseries,
-    filename_min_max_timeseries,
-    filename_cost_timeseries,
-    fuel_cost_pathway,
-    investment_cost_pathway,
-    starttime,
-    endtime,
-    freq="24H",
-    multiplicator=24,
-    overlap_in_timesteps=0,
-):
-    """Method used to parse the input sheets used to create oemof elements from the
-    input Excel workbook(s).
-
-    Since parsing the complete sheets and slicing is too time consuming for
-    timeseries data sheets, only the number of rows ranging from starttime
-    to endtime will be parsed. Therefore, the starting and endpoint have to
-    be determined.
-
-    Parameters
-    ----------
-    path_folder_input : :obj:`str`
-        The file path where input files are stored (common folder)
-
-    filename_node_data : :obj:`str`
-        Name of Excel Workbook containing all data for creating nodes (buses and oemof components)
-
-    filename_cost_data : :obj:`str`
-        Name of Excel Workbook containing cost pathways for oemof components
-
-    filename_node_timeseries : :obj:`str`
-       Filename of the node timeseries data, given in a separate .csv file
-
-    filename_min_max_timeseries  : :obj:`str`
-       Filename of the min / max transformer data, given in a separate .csv file
-
-    filename_cost_timeseries : :obj:`str`
-       Filename of the cost timeseries data, given in a separate .csv file
-
-    fuel_cost_pathway : :obj:`str`
-        variable indicating which fuel cost pathway to use
-        Possible values 'lower', 'middle', 'upper'
-
-    investment_cost_pathway : :obj:`str`
-        variable indicating which investment cost pathway to use
-        Possible values 'lower', 'middle', 'upper'
-
-    starttime : :obj:`str`
-        The starting timestamp of the optimization timeframe
-
-    endtime : :obj:`str`
-        The end timestamp of the optimization timeframe
-
-    freq : :obj:`string`
-        A string defining the timeseries target frequency; determined by the
-        model configuration
-
-    multiplicator : :obj:`int`
-        A multiplicator to convert the input data given with an hourly resolution
-        to another (usually a lower) one
-
-    overlap_in_timesteps : :obj:`int`
-        the overlap in timesteps if a rolling horizon model is run
-        (to prevent index out of bounds error)
-
-    Returns
-    -------
-    All component DataFrames (i.e. buses, transformerns, renewables, demand,
-    storages, commodity_sources and timeseries data) with its parameters
-    obtained from the input Excel workbook
-
-    """
-
-    # manually set input path for change to csv files
-    path_folder_input_csv = "../data/Outputlisten_Test_Invest/"
-
-    # Read in node Excel file and parse its spreadsheets to pd.DataFrames
-    xls_node = pd.ExcelFile(path_folder_input + filename_node_data)
-    "here change for buses to from csv!!!"
-    buses_df = pd.read_csv(path_folder_input_csv + "buses" + ".csv", index_col=0)
-    # buses_df = xls_node.parse('buses', index_col=0)
-    excess_df = pd.read_csv(
-        path_folder_input_csv + "sinks_excess" + ".csv", index_col=0
-    )
-    # excess_df = xls_node.parse('excess', index_col=0)
-    shortage_df = pd.read_csv(
-        path_folder_input_csv + "sources_shortage" + ".csv", index_col=0
-    )
-    # shortage_df = xls_node.parse('shortage', index_col=0)
-    commodity_sources_df = pd.read_csv(
-        path_folder_input_csv + "sources_commodity" + ".csv", index_col=0
-    )
-    # commodity_sources_df = xls_node.parse('commodity_sources', index_col=0)
-    renewables_df = pd.read_csv(
-        path_folder_input_csv + "sources_renewables" + ".csv", index_col=0
-    )
-    # renewables_df = xls_node.parse('renewables', index_col=0)
-    demand_df = pd.read_csv(
-        path_folder_input_csv + "sinks_demand_el" + ".csv", index_col=0
-    )
-    # demand_df = xls_node.parse('demand', index_col=0)
-
-    existing_transformers_df = pd.read_csv(
-        path_folder_input_csv + "transformers_clustered" + ".csv", index_col=0
-    )
-    # existing_transformers_df = xls_node.parse('existing_transformers', index_col=0)
-    new_built_transformers_df = pd.read_csv(
-        path_folder_input_csv + "transformers_new" + ".csv", index_col=0
-    )
-    # new_built_transformers_df = xls_node.parse('new_built_transformers', index_col=0)
-
-    # Adapt transformer information to frequency information
-    # For the sake of interpretation, not the capacities itselfs are multiplied
-    # with the multiplicator, but min as well as max outputs
-    # NOTE: gradients are not (yet) included in the investment mode
-    existing_transformers_df.loc[
-        :, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]
-    ] = existing_transformers_df.loc[
-        :, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]
-    ].mul(
-        multiplicator
-    )
-
-    new_built_transformers_df.loc[
-        :, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]
-    ] = new_built_transformers_df.loc[
-        :, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]
-    ].mul(
-        multiplicator
-    )
-
-    existing_storages_df = pd.read_csv(
-        path_folder_input_csv + "storages_el" + ".csv", index_col=0
-    )
-    # existing_storages_df = xls_node.parse('existing_storages', index_col=0)
-    new_built_storages_df = pd.read_csv(
-        path_folder_input_csv + "storages_new" + ".csv", index_col=0
-    )
-    # new_built_storages_df = xls_node.parse('new_built_storages', index_col=0)
-
-    # Set empty entries to 'None' (pandas default 'NaN' cannot be handled by Pyomo)
-    # Furthermore adapt storage information to frequency information
-    new_built_storages_df = new_built_storages_df.where(
-        pd.notnull(new_built_storages_df), None
-    )
-
-    existing_storages_df.loc[
-        :, ["max_storage_level", "min_storage_level", "nominal_storable_energy"]
-    ] = existing_storages_df.loc[
-        :, ["max_storage_level", "min_storage_level", "nominal_storable_energy"]
-    ].mul(
-        multiplicator
-    )
-
-    new_built_storages_df.loc[
-        :, ["max_storage_level", "min_storage_level", "nominal_storable_energy"]
-    ] = new_built_storages_df.loc[
-        :, ["max_storage_level", "min_storage_level", "nominal_storable_energy"]
-    ].mul(
-        multiplicator
-    )
-
-    # Parse sheets for exogeneous commissioning and decommissioning
-    existing_transformers_decom_df = pd.read_csv(
-        path_folder_input_csv + "transformers_decommissioning" + ".csv", index_col=0
-    )
-    # existing_transformers_decom_df = xls_node.parse('transformers_decommissioning', index_col=0)
-    new_transformers_de_com_df = pd.read_csv(
-        path_folder_input_csv + "transformers_new_decommissioning" + ".csv", index_col=0
-    )
-    # new_transformers_de_com_df = xls_node.parse('new_transformers_de_comm', index_col=0)
-    renewables_com_df = pd.read_csv(
-        path_folder_input_csv + "renewables_commissioning" + ".csv", index_col=0
-    )
-    # renewables_com_df = xls_node.parse('renewables_commissioning', index_col=0)
-
-    # Parse index column only in order to determine start and end point for values to parse (via index)
-    node_start = pd.read_csv(
-        path_folder_input_csv + filename_node_timeseries,
-        parse_dates=True,
-        index_col=0,
-        usecols=[0],
-    )
-    start = pd.Index(node_start.index).get_loc(starttime)
-    timeseries_end = pd.Timestamp(endtime, freq)
-    end = pd.Index(node_start.index).get_loc(
-        (timeseries_end + overlap_in_timesteps * timeseries_end.freq).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-    )
-
-    node_timeseries_df = resample_timeseries(
-        pd.read_csv(
-            path_folder_input_csv + filename_node_timeseries,
-            parse_dates=True,
-            index_col=0,
-            skiprows=range(1, start + 1),
-            nrows=end - start + 1,
-        ),
-        freq,
-        aggregation_rule="sum",
-    )
-
-    # Commissions / decommissions only happen on an annual basis
-    # (slice year, month and date (20XX-01-01))
-    min_max_start = pd.read_csv(
-        path_folder_input_csv + filename_min_max_timeseries,
-        parse_dates=True,
-        index_col=0,
-        usecols=[0],
-    )
-    start = pd.Index(min_max_start.index).get_loc(starttime[:10])[0]
-    timeseries_end = pd.Timestamp(endtime, freq)
-    end = pd.Index(min_max_start.index).get_loc(
-        str((timeseries_end + overlap_in_timesteps * timeseries_end.freq).year + 1)
-        + "-01-01"
-    )[0]
-
-    # Workaround used here: Fillna using ffill and delete last value not needed anymore
-    min_max_timeseries_df = resample_timeseries(
-        pd.read_csv(
-            path_folder_input_csv + filename_min_max_timeseries,
-            parse_dates=True,
-            index_col=0,
-            header=[0, 1],
-            skiprows=range(2, start + 1),
-            nrows=end - start + 1,
-        )
-        .resample("H")
-        .fillna(method="ffill")[:-1],
-        freq,
-        aggregation_rule="sum",
-    )
-
-    # Read in cost Excel file  and parse its spreadsheets to pd.DataFrames
-    """new import of cost via csv"""
-
-    # xls_cost = pd.ExcelFile(path_folder_input + filename_cost_data)
-
-    fuel_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_fuel" + ".csv", index_col=0
-    )
-    # fuel_costs_df = xls_cost.parse(fuel_cost_pathway + '_fuel_costs', index_col=0)
-    operation_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_operation" + ".csv", index_col=0
-    )
-    # operation_costs_df = xls_cost.parse('operation_costs', index_col=0)
-    ramping_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_ramping" + ".csv", index_col=0
-    )
-    # ramping_costs_df = xls_cost.parse('ramping_costs', index_col=0)
-    startup_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_startup" + ".csv", index_col=0
-    )
-    startup_costs_df.columns[1 : len((startup_costs_df.columns))].astype(int)
-    # startup_costs_df = xls_cost.parse('startup_costs', index_col=0)
-    storage_var_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_operation_storages" + ".csv", index_col=0
-    )
-    storage_var_costs_df.columns = storage_var_costs_df.columns.astype(int)
-    # storage_var_costs_df = xls_cost.parse('storage_var_costs', index_col=0)
-
-    investment_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_invest" + ".csv", index_col=0
-    )
-    investment_costs_df.columns = investment_costs_df.columns.astype(int)
-    # investment_costs_df = xls_cost.parse(investment_cost_pathway + '_investment_costs', index_col=0)
-    storage_investment_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_invest_storage" + ".csv", index_col=0
-    )
-    storage_investment_costs_df.columns = storage_investment_costs_df.columns.astype(
-        int
-    )
-    # storage_investment_costs_df = xls_cost.parse('storage_inv_costs', index_col=0)
-    storage_pump_investment_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_invest_storage_pump" + ".csv", index_col=0
-    )
-    storage_pump_investment_costs_df.columns = (
-        storage_pump_investment_costs_df.columns.astype(int)
-    )
-    # storage_pump_investment_costs_df = xls_cost.parse('storage_pump_inv_costs', index_col=0)
-    storage_turbine_investment_costs_df = pd.read_csv(
-        path_folder_input_csv + "costs_invest_storage_pump" + ".csv", index_col=0
-    )
-    storage_turbine_investment_costs_df.columns = (
-        storage_turbine_investment_costs_df.columns.astype(int)
-    )
-    # storage_turbine_investment_costs_df = xls_cost.parse('storage_turbine_inv_costs', index_col=0)
-    WACC_df = pd.read_csv(path_folder_input_csv + "WACC" + ".csv", index_col=0)
-    WACC_df.columns = WACC_df.columns.astype(int)
-    # WACC_df = xls_cost.parse('WACC', index_col=0)
-
-    # Parse index column only in order to determine start and end point for values to parse (via index)
-    # NOTE: If node and cost data have the same starting point and frequency,
-    # this becomes obsolete and fastens up parsing of input data
-    cost_start = pd.read_csv(
-        path_folder_input_csv + filename_cost_timeseries,
-        parse_dates=True,
-        index_col=0,
-        usecols=[0],
-    )
-    start = pd.Index(cost_start.index).get_loc(starttime[:10])
-    timeseries_end = pd.Timestamp(endtime, freq)
-    end = pd.Index(cost_start.index).get_loc(
-        str((timeseries_end + overlap_in_timesteps * timeseries_end.freq).year + 1)
-        + "-01-01"
-    )
-
-    # Workaround used here: Fillna using ffill and
-    # delete last value not needed anymore
-    cost_timeseries_df = (
-        pd.read_csv(
-            path_folder_input_csv + filename_cost_timeseries,
-            parse_dates=True,
-            index_col=0,
-            header=[0, 1],
-            skiprows=range(2, start + 1),
-            nrows=end - start + 1,
-        )
-        .resample(freq)
-        .fillna(method="ffill")[:-1]
-    )
-
-    # TODO, JK/YW: Introduce a dict of DataFrames for better handling
-    return (
-        buses_df,
-        excess_df,
-        shortage_df,
-        commodity_sources_df,
-        existing_transformers_df,
-        new_built_transformers_df,
-        renewables_df,
-        demand_df,
-        existing_storages_df,
-        new_built_storages_df,
-        existing_transformers_decom_df,
-        new_transformers_de_com_df,
-        renewables_com_df,
-        node_timeseries_df,
-        min_max_timeseries_df,
-        fuel_costs_df,
-        operation_costs_df,
-        ramping_costs_df,
-        startup_costs_df,
-        storage_var_costs_df,
-        investment_costs_df,
-        storage_investment_costs_df,
-        storage_pump_investment_costs_df,
-        storage_turbine_investment_costs_df,
-        WACC_df,
-        cost_timeseries_df,
-    )
-
-
 def create_buses(input_data, node_dict):
     r"""Create buses and add them to the dict of nodes.
 
@@ -442,7 +84,7 @@ def create_buses(input_data, node_dict):
         the buses elements
     """
     for i, b in input_data["buses"].iterrows():
-        node_dict[i] = solph.Bus(label=i)
+        node_dict[i] = solph.buses.Bus(label=i)
 
     return node_dict
 
@@ -471,10 +113,10 @@ def create_commodity_sources(input_data, im, node_dict):
     """
     # Regular commodity sources
     for i, cs in input_data["sources_commodity"].iterrows():
-        node_dict[i] = solph.Source(
+        node_dict[i] = solph.components.Source(
             label=i,
             outputs={
-                node_dict[cs["to"]]: solph.Flow(
+                node_dict[cs["to"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_fuel"].loc[i, 2020]
                         * np.array(
@@ -495,16 +137,9 @@ def create_commodity_sources(input_data, im, node_dict):
             },
         )
 
-    # Fluctuating renewables in Germany
-    for i, cs in input_data["sources_renewables_fluc"].iterrows():
-        node_dict[i] = solph.Source(
-            label=i, outputs={node_dict[cs["to"]]: solph.Flow()}
-        )
-
     return node_dict
 
 
-# TODO: SHOW A WARNING IF SHORTAGE OR EXCESS ARE ACTIVE
 def create_shortage_sources(input_data, node_dict):
     r"""Create shortage sources and add them to the dict of nodes.
 
@@ -524,10 +159,10 @@ def create_shortage_sources(input_data, node_dict):
         the shortage source elements
     """
     for i, s in input_data["sources_shortage"].iterrows():
-        node_dict[i] = solph.Source(
+        node_dict[i] = solph.components.Source(
             label=i,
             outputs={
-                node_dict[s["to"]]: solph.Flow(variable_costs=s["shortage_costs"])
+                node_dict[s["to"]]: solph.flows.Flow(variable_costs=s["shortage_costs"])
             },
         )
 
@@ -558,10 +193,10 @@ def create_renewables(input_data, im, node_dict):
     """
     for i, re in input_data["sources_renewables"].iterrows():
         try:
-            node_dict[i] = solph.Source(
+            node_dict[i] = solph.components.Source(
                 label=i,
                 outputs={
-                    node_dict[re["to"]]: solph.Flow(
+                    node_dict[re["to"]]: solph.flows.Flow(
                         fix=np.array(
                             input_data["sources_renewables_ts"][i][
                                 im.start_time : im.end_time
@@ -716,7 +351,7 @@ def create_demand(input_data, im, node_dict, dr_overall_load_ts_df=None):
         kwargs_dict = {
             "label": i,
             "inputs": {
-                node_dict[d["from"]]: solph.Flow(
+                node_dict[d["from"]]: solph.flows.Flow(
                     fix=np.array(
                         input_data["sinks_demand_el_ts"][i][im.start_time : im.end_time]
                     ),
@@ -729,7 +364,7 @@ def create_demand(input_data, im, node_dict, dr_overall_load_ts_df=None):
         # and the baseline load profile for demand response units
         if im.activate_demand_response and i == "DE_sink_el_load":
             kwargs_dict["inputs"] = {
-                node_dict[d["from"]]: solph.Flow(
+                node_dict[d["from"]]: solph.flows.Flow(
                     fix=np.array(
                         input_data["sinks_demand_el_ts"][i][im.start_time : im.end_time]
                         .mul(d["maximum_2020"])
@@ -739,7 +374,7 @@ def create_demand(input_data, im, node_dict, dr_overall_load_ts_df=None):
                 )
             }
 
-        node_dict[i] = solph.Sink(**kwargs_dict)
+        node_dict[i] = solph.components.Sink(**kwargs_dict)
 
     return node_dict
 
@@ -822,12 +457,12 @@ def create_demand_response_units(input_data, im, node_dict):
 
         # TODO: Critically check min and max invest params
         approach_dict = {
-            "DLR": solph.custom.SinkDSM(
+            "DLR": solph.components.experimental.SinkDSM(
                 label=i,
-                inputs={node_dict[d["from"]]: solph.Flow(variable_costs=0)},
+                inputs={node_dict[d["from"]]: solph.flows.Flow(variable_costs=0)},
                 **kwargs_all,
                 **kwargs_dict["DLR"],
-                invest=solph.options.Investment(
+                invest=solph.Investment(
                     minimum=0,
                     maximum=min(
                         d["max_cap"] + d["potential_neg_overall"], d["installed_cap"]
@@ -835,12 +470,12 @@ def create_demand_response_units(input_data, im, node_dict):
                     ep_costs=d["specific_investments"] * 1e3,
                 ),
             ),
-            "DIW": solph.custom.SinkDSM(
+            "DIW": solph.components.experimental.SinkDSM(
                 label=i,
-                inputs={node_dict[d["from"]]: solph.Flow(variable_costs=0)},
+                inputs={node_dict[d["from"]]: solph.flows.Flow(variable_costs=0)},
                 **kwargs_all,
                 **kwargs_dict["DIW"],
-                invest=solph.options.Investment(
+                invest=solph.Investment(
                     minimum=0,
                     maximum=min(
                         d["max_cap"] + d["potential_neg_overall"], d["installed_cap"]
@@ -848,12 +483,12 @@ def create_demand_response_units(input_data, im, node_dict):
                     ep_costs=d["specific_investments"] * 1e3,
                 ),
             ),
-            "oemof": solph.custom.SinkDSM(
+            "oemof": solph.components.experimental.SinkDSM(
                 label=i,
-                inputs={node_dict[d["from"]]: solph.Flow(variable_costs=0)},
+                inputs={node_dict[d["from"]]: solph.flows.Flow(variable_costs=0)},
                 **kwargs_all,
                 **kwargs_dict["oemof"],
-                invest=solph.options.Investment(
+                invest=solph.Investment(
                     minimum=0,
                     maximum=min(
                         d["max_cap"] + d["potential_neg_overall"], d["installed_cap"]
@@ -898,9 +533,11 @@ def create_excess_sinks(input_data, node_dict):
         the excess sink elements
     """
     for i, e in input_data["sinks_excess"].iterrows():
-        node_dict[i] = solph.Sink(
+        node_dict[i] = solph.components.Sink(
             label=i,
-            inputs={node_dict[e["from"]]: solph.Flow(variable_costs=e["excess_costs"])},
+            inputs={
+                node_dict[e["from"]]: solph.flows.Flow(variable_costs=e["excess_costs"])
+            },
         )
 
     return node_dict
@@ -933,12 +570,12 @@ def build_chp_transformer(i, t, node_dict, outflow_args_el, outflow_args_th):
         The transformer element to be added to the dict of nodes
         as i-th element
     """
-    node_dict[i] = solph.Transformer(
+    node_dict[i] = solph.components.Transformer(
         label=i,
-        inputs={node_dict[t["from"]]: solph.Flow()},
+        inputs={node_dict[t["from"]]: solph.flows.Flow()},
         outputs={
-            node_dict[t["to_el"]]: solph.Flow(**outflow_args_el),
-            node_dict[t["to_th"]]: solph.Flow(**outflow_args_th),
+            node_dict[t["to_el"]]: solph.flows.Flow(**outflow_args_el),
+            node_dict[t["to_th"]]: solph.flows.Flow(**outflow_args_th),
         },
         conversion_factors={
             node_dict[t["to_el"]]: t["efficiency_el_CC"],
@@ -976,16 +613,16 @@ def build_var_chp_units(i, t, node_dict, outflow_args_el, outflow_args_th):
 
     Returns
     -------
-    node_dict[i] : oemof.solph.custom.ExtractionTurbineCHP
+    node_dict[i] : oemof.solph.components.ExtractionTurbineCHP
         The extraction turbine element to be added to the dict of nodes
         as i-th element
     """
-    node_dict[i] = solph.ExtractionTurbineCHP(
+    node_dict[i] = solph.components.ExtractionTurbineCHP(
         label=i,
-        inputs={node_dict[t["from"]]: solph.Flow()},
+        inputs={node_dict[t["from"]]: solph.flows.Flow()},
         outputs={
-            node_dict[t["to_el"]]: solph.Flow(**outflow_args_el),
-            node_dict[t["to_th"]]: solph.Flow(**outflow_args_th),
+            node_dict[t["to_el"]]: solph.flows.Flow(**outflow_args_el),
+            node_dict[t["to_th"]]: solph.flows.Flow(**outflow_args_th),
         },
         conversion_factors={
             node_dict[t["to_el"]]: t["efficiency_el_CC"],
@@ -1017,14 +654,14 @@ def build_condensing_transformer(i, t, node_dict, outflow_args_el):
 
     Returns
     -------
-    node_dict[i] : `transformer <oemof.network.Transformer>`
+    node_dict[i] : `transformer <oemof.solph.components.Transformer>`
         The transformer element to be added to the dict of nodes
         as i-th element
     """
-    node_dict[i] = solph.Transformer(
+    node_dict[i] = solph.components.Transformer(
         label=i,
-        inputs={node_dict[t["from"]]: solph.Flow()},
-        outputs={node_dict[t["to_el"]]: solph.Flow(**outflow_args_el)},
+        inputs={node_dict[t["from"]]: solph.flows.Flow()},
+        outputs={node_dict[t["to_el"]]: solph.flows.Flow(**outflow_args_el)},
         conversion_factors={node_dict[t["to_el"]]: t["efficiency_el"]},
     )
 
@@ -1364,8 +1001,6 @@ def create_new_built_transformers(
         Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
 
     """
-    startyear = pd.to_datetime(im.starttime).year
-
     for i, t in input_data["new_built_transformers"].iterrows():
 
         existing_capacity = calc_exist_cap(t, im.startyear, im.endyear, "existing_")
@@ -1886,87 +1521,100 @@ def create_storages(
         return node_dict, new_built_storage_labels, endo_exo_exist_stor_df
 
 
-def build_existing_storage(i, s, node_dict, storage_var_costs_df, startyear):
-    """Function used to actually build investment storage elements.
-    Function is called by create_invest_storages as well as by create_invest_storages_RH.
-    Separate function definition in order to increase code readability.
+def create_existing_storages(input_data, im, node_dict):
+    r"""Create existing storages and add them to the dict of nodes.
 
     Parameters
     ----------
-    i : :obj:`str`
-        label of current transformer (within iteration)
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
 
-    s : :obj:`pd.Series`
-        pd.Series containing attributes for storage component (row-wise data entries)
+    im : :class:`InvestmenthModel`
+        The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
 
-    storage_var_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage variable costs
-
-    startyear : :obj:`int`
-        The startyear of the optimization timeframe
-
     Returns
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
-
+        Modified dictionary containing all nodes of the EnergySystem
+        including the storage elements
     """
-    node_dict[i] = solph.components.GenericStorage(
-        label=i,
-        inputs={
-            node_dict[s["bus"]]: solph.Flow(
-                nominal_value=s["existing_pump_" + str(startyear)],
-                variable_costs=storage_var_costs_df.loc[i, startyear],
-                max=s["max_storage_level"],
+    for i, s in input_data["storages_el"].iterrows():
+
+        if s["type"] == "phes":
+            node_dict[i] = solph.components.GenericStorage(
+                label=i,
+                inputs={
+                    node_dict[s["bus_inflow"]]: solph.flows.Flow(
+                        nominal_value=s["capacity_pump"],
+                        variable_costs=(
+                            input_data["costs_operation_storages_ts"].loc[i, 2020]
+                            * input_data["costs_operation_storages"].loc[
+                                im.starttime : im.endtime, i
+                            ]
+                        ).to_numpy(),
+                    )
+                },
+                outputs={
+                    node_dict[s["bus_outflow"]]: solph.flows.Flow(
+                        nominal_value=s["capacity_turbine"],
+                        variable_costs=(
+                            input_data["costs_operation_storages"].loc[i, 2020]
+                            * input_data["costs_operation_storages"].loc[
+                                im.starttime : im.endtime, i
+                            ]
+                        ).to_numpy(),
+                    )
+                },
+                nominal_storage_capacity=s["nominal_storable_energy"],
+                loss_rate=s["loss_rate"],
+                initial_storage_level=s["initial_storage_level"],
+                max_storage_level=s["max_storage_level"],
+                min_storage_level=s["min_storage_level"],
+                inflow_conversion_factor=s["efficiency_pump"],
+                outflow_conversion_factor=s["efficiency_turbine"],
+                balanced=True,
             )
-        },
-        outputs={
-            node_dict[s["bus"]]: solph.Flow(
-                nominal_value=s["existing_turbine_" + str(startyear)],
-                variable_costs=storage_var_costs_df.loc[i, startyear],
-                max=s["max_storage_level"],
+
+        if s["type"] == "reservoir":
+            node_dict[i] = solph.components.GenericStorage(
+                label=i,
+                inputs={node_dict[s["bus_inflow"]]: solph.flows.Flow()},
+                outputs={
+                    node_dict[s["bus_outflow"]]: solph.flows.Flow(
+                        nominal_value=s["capacity_turbine"],
+                        variable_costs=(
+                            input_data["costs_operation_storages"].loc[i, 2020]
+                            * input_data["costs_operation_storages"].loc[
+                                im.starttime : im.endtime, i
+                            ]
+                        ).to_numpy(),
+                        min=s["min_load_factor"],
+                        max=s["max_load_factor"],
+                    )
+                },
+                nominal_storage_capacity=s["nominal_storable_energy"],
+                loss_rate=s["loss_rate"],
+                initial_storage_level=s["initial_storage_level"],
+                max_storage_level=s["max_storage_level"],
+                min_storage_level=s["min_storage_level"],
+                inflow_conversion_factor=s["efficiency_pump"],
+                outflow_conversion_factor=s["efficiency_turbine"],
+                balanced=True,
             )
-        },
-        nominal_storage_capacity=s["existing_" + str(startyear)],
-        # Be careful with the implementation of loss rate
-        # TODO, YW: Check back with input data!
-        loss_rate=s["loss_rate"] * s["max_storage_level"],
-        initial_storage_level=s["initial_storage_level"],
-        # @YW: Julien suggested to use balanced=False
-        # I don't see any benefit in this. What do you think?
-        balanced=True,
-        max_storage_level=s["max_storage_level"],
-        min_storage_level=s["min_storage_level"],
-        inflow_conversion_factor=s["efficiency_pump"],
-        outflow_conversion_factor=s["efficiency_turbine"],
-    )
 
-    return node_dict[i]
+    return node_dict
 
 
-# CHANGED
-def build_new_built_storage(
-    i,
-    s,
+def create_new_built_storages(
+    input_data,
+    im,
     node_dict,
-    storage_var_costs_df,
-    storage_investment_costs_df,
-    storage_pump_investment_costs_df,
-    storage_turbine_investment_costs_df,
-    WACC_df,
-    MaxInvest,
-    startyear,
-    endyear,
-    optimization_timeframe,
 ):
-    """Function used to actually build investment storage elements
-    (new built units only).
-    Function is called by create_invest_storages as well as by
-    create_invest_storages_RH.
-    Separate function definition in order to increase code readability.
+    """Create new-built storages and add them to the dict of nodes
 
     Parameters
     ----------
@@ -2007,108 +1655,111 @@ def build_new_built_storage(
         Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
 
     """
-    # Add upcoming commissioned capacity to existing
-    existing_pump = calc_exist_cap(s, startyear, endyear, "existing_pump_")
-    existing_turbine = calc_exist_cap(s, startyear, endyear, "existing_turbine_")
-    existing = calc_exist_cap(s, startyear, endyear, "existing_")
-
-    # overall invest limit is the amount of capacity that can at maximum be installed
-    # i.e. the potential limit of a given technology
-    overall_invest_limit_pump = s["overall_invest_limit_pump"]
-    overall_invest_limit_turbine = s["overall_invest_limit_turbine"]
-    overall_invest_limit = s["overall_invest_limit"]
-
-    annual_invest_limit_pump = s["max_invest_pump"]
-    annual_invest_limit_turbine = s["max_invest_turbine"]
-    annual_invest_limit = s["max_invest"]
-
-    # invest_max is the amount of capacity that can maximally be installed
-    # within the optimization timeframe
-    if overall_invest_limit_pump - existing_pump <= 0:
-        max_bound1 = 0
-    else:
-        max_bound1 = overall_invest_limit_pump - existing_pump
-
-    if overall_invest_limit_turbine - existing_turbine <= 0:
-        max_bound2 = 0
-    else:
-        max_bound2 = overall_invest_limit_turbine - existing_turbine
-
-    if overall_invest_limit - existing <= 0:
-        max_bound3 = 0
-    else:
-        max_bound3 = overall_invest_limit - existing
-
-    if MaxInvest:
-        invest_max_pump = np.min(
-            [max_bound1, annual_invest_limit_pump * optimization_timeframe]
+    for i, s in input_data["new_built_storages"].iterrows():
+        # Add upcoming commissioned capacity to existing
+        existing_pump = calc_exist_cap(s, im.startyear, im.endyear, "existing_pump_")
+        existing_turbine = calc_exist_cap(
+            s, im.startyear, im.endyear, "existing_turbine_"
         )
-        invest_max_turbine = np.min(
-            [max_bound2, annual_invest_limit_turbine * optimization_timeframe]
-        )
-        invest_max = np.min([max_bound3, annual_invest_limit * optimization_timeframe])
-    else:
-        invest_max_pump = float("inf")
-        invest_max_turbine = float("inf")
-        invest_max = float("inf")
+        existing = calc_exist_cap(s, im.startyear, im.endyear, "existing_")
 
-    wacc = WACC_df.loc[i, startyear]
+        # overall invest limit is the amount of capacity that can be installed
+        # at maximum, i.e. the potential limit of a given technology
+        overall_invest_limit_pump = s["overall_invest_limit_pump"]
+        overall_invest_limit_turbine = s["overall_invest_limit_turbine"]
+        overall_invest_limit = s["overall_invest_limit"]
 
-    node_dict[i] = solph.components.GenericStorage(
-        label=i,
-        inputs={
-            node_dict[s["bus"]]: solph.Flow(
-                variable_costs=storage_var_costs_df.loc[i, startyear],
-                max=s["max_storage_level"],
-                investment=solph.Investment(
-                    maximum=invest_max_pump,
-                    ep_costs=economics.annuity(
-                        capex=storage_pump_investment_costs_df.loc[i, startyear],
-                        n=s["unit_lifetime_pump"],
-                        wacc=wacc,
-                    ),
-                    existing=existing_pump,
-                ),
+        annual_invest_limit_pump = s["max_invest_pump"]
+        annual_invest_limit_turbine = s["max_invest_turbine"]
+        annual_invest_limit = s["max_invest"]
+
+        max_bound1 = max(overall_invest_limit_pump - existing_pump, 0)
+        max_bound2 = max(overall_invest_limit_turbine - existing_turbine, 0)
+        max_bound3 = max(overall_invest_limit - existing, 0)
+
+        if im.impose_investment_maxima:
+            invest_max_pump = np.min(
+                [max_bound1, annual_invest_limit_pump * im.optimization_timeframe]
             )
-        },
-        outputs={
-            node_dict[s["bus"]]: solph.Flow(
-                variable_costs=storage_var_costs_df.loc[i, startyear],
-                max=s["max_storage_level"],
-                investment=solph.Investment(
-                    maximum=invest_max_turbine,
-                    ep_costs=economics.annuity(
-                        capex=storage_turbine_investment_costs_df.loc[i, startyear],
-                        n=s["unit_lifetime_turbine"],
-                        wacc=wacc,
-                    ),
-                    existing=existing_turbine,
-                ),
+            invest_max_turbine = np.min(
+                [max_bound2, annual_invest_limit_turbine * im.optimization_timeframe]
             )
-        },
-        loss_rate=s["loss_rate"] * s["max_storage_level"],
-        initial_storage_level=s["initial_storage_level"],
-        # @YW: Same as for existing storages (see above)
-        balanced=True,
-        max_storage_level=s["max_storage_level"],
-        min_storage_level=s["min_storage_level"],
-        invest_relation_input_output=s["invest_relation_input_output"],
-        invest_relation_input_capacity=s["invest_relation_input_capacity"],
-        invest_relation_output_capacity=s["invest_relation_output_capacity"],
-        inflow_conversion_factor=s["efficiency_pump"],
-        outflow_conversion_factor=s["efficiency_turbine"],
-        investment=solph.Investment(
-            maximum=invest_max,
-            ep_costs=economics.annuity(
-                capex=storage_investment_costs_df.loc[i, startyear],
-                n=s["unit_lifetime"],
-                wacc=wacc,
+            invest_max = np.min(
+                [max_bound3, annual_invest_limit * im.optimization_timeframe]
+            )
+        else:
+            invest_max_pump = float("inf")
+            invest_max_turbine = float("inf")
+            invest_max = float("inf")
+
+        wacc = input_data["wacc"].loc[i, im.startyear]
+
+        node_dict[i] = solph.components.GenericStorage(
+            label=i,
+            inputs={
+                node_dict[s["bus"]]: solph.flows.Flow(
+                    variable_costs=(
+                        input_data["costs_operation_storages"].loc[i, 2020]
+                        * input_data["costs_operation_storages"].loc[
+                            im.starttime : im.endtime, i
+                        ]
+                    ).to_numpy(),
+                    max=s["max_storage_level"],
+                    investment=solph.Investment(
+                        maximum=invest_max_pump,
+                        ep_costs=economics.annuity(
+                            capex=input_data["storage_pump_investment_costs"].loc[
+                                i, im.startyear
+                            ],
+                            n=s["unit_lifetime_pump"],
+                            wacc=wacc,
+                        ),
+                        existing=existing_pump,
+                    ),
+                )
+            },
+            outputs={
+                node_dict[s["bus"]]: solph.flows.Flow(
+                    variable_costs=(
+                        input_data["costs_operation_storages"].loc[i, 2020]
+                        * input_data["costs_operation_storages"].loc[
+                            im.starttime : im.endtime, i
+                        ]
+                    ).to_numpy(),
+                    max=s["max_storage_level"],
+                    investment=solph.Investment(
+                        maximum=invest_max_turbine,
+                        ep_costs=economics.annuity(
+                            capex=input_data["storage_turbine_investment_costs"].loc[
+                                i, im.startyear
+                            ],
+                            n=s["unit_lifetime_turbine"],
+                            wacc=wacc,
+                        ),
+                        existing=existing_turbine,
+                    ),
+                )
+            },
+            loss_rate=s["loss_rate"],
+            max_storage_level=s["max_storage_level"],
+            min_storage_level=s["min_storage_level"],
+            inflow_conversion_factor=s["efficiency_pump"],
+            outflow_conversion_factor=s["efficiency_turbine"],
+            invest_relation_input_output=s["invest_relation_input_output"],
+            invest_relation_input_capacity=s["invest_relation_input_capacity"],
+            invest_relation_output_capacity=s["invest_relation_output_capacity"],
+            investment=solph.Investment(
+                maximum=invest_max,
+                ep_costs=economics.annuity(
+                    capex=input_data["storage_investment_costs"].loc[i, im.startyear],
+                    n=s["unit_lifetime"],
+                    wacc=wacc,
+                ),
+                existing=existing,
             ),
-            existing=existing,
-        ),
-    )
+        )
 
-    return node_dict[i]
+    return node_dict
 
 
 def build_new_built_storage_RH(
@@ -2268,7 +1919,7 @@ def build_new_built_storage_RH(
     node_dict[i] = solph.components.GenericStorage(
         label=i,
         inputs={
-            node_dict[s["bus"]]: solph.Flow(
+            node_dict[s["bus"]]: solph.flows.Flow(
                 variable_costs=storage_var_costs_df.loc[i, startyear],
                 max=s["max_storage_level"],
                 investment=solph.Investment(
