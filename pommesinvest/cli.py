@@ -12,6 +12,7 @@ control_parameters:
     solver: "gurobi"
     fuel_cost_pathway: "NZE"
     emissions_cost_pathway: "long-term"
+    investment_cost_pathway: "middle"
     activate_emissions_limit: False
     emissions_pathway: "100_percent_linear"
     activate_demand_response: False
@@ -36,7 +37,7 @@ input_output_parameters:
 # 4) Set rolling (myopic) horizon parameters (optional)
 rolling_horizon_parameters:
     myopic_horizon_in_years: 4
-    overlap_in_timesteps: 0"""
+    overlap_in_years: 0"""
     with open("./config.yml", "w") as opf:
         opf.write(content)
 

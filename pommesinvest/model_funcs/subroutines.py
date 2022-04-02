@@ -711,149 +711,6 @@ def build_condensing_transformer(i, t, node_dict, outflow_args_el):
     return node_dict[i]
 
 
-def create_transformers(
-    input_data,
-    im,
-    node_dict,
-    # Garbage
-    existing_transformers_df,
-    new_built_transformers_df,
-    AggregateInput,
-    operation_costs_df,
-    ramping_costs_df,
-    investment_costs_df,
-    WACC_df,
-    cost_timeseries_df,
-    min_max_timeseries_df,
-    MaxInvest,
-    starttime,
-    endtime,
-    endyear,
-    optimization_timeframe=1,
-    counter=0,
-    transformers_init_df=pd.DataFrame(),
-    years_per_timeslice=0,
-):
-    """Function to create all transformer elements. Calls functions for
-    creating existing resp. new built transformers (fleets).
-
-    Parameters
-    ----------
-    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Dictionary containing all nodes of the EnergySystem (not including
-        transformers)
-
-    existing_transformers_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the existing transformer elements to be created
-        (i.e. existing plants for which no investments occur)
-
-    new_built_transformers_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the potentially new built transformer elements
-        to be created (i.e. investment alternatives which may be invested in)
-
-    AggregateInput: :obj:`boolean`
-        If True an aggregated transformers input data set is used, elsewhise
-        the full transformers input data set is used
-
-    RollingHorizon: :obj:`boolean`
-        If True a myopic (Rolling horizon) optimization run is carried out,
-        elsewhise a simple overall optimization approach is chosen
-
-    operation_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the operation costs data
-
-    ramping_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the ramping costs data
-
-    investment_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the operation costs data
-
-    WACC_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the WACC data
-
-    cost_timeseries_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the cost timeseries data
-
-    min_max_timeseries_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing min resp. max output of a transformer as a
-        timeseries in order to deal with (exogeneously determined) commissions
-        or decommissions during runtime
-
-    starttime : :obj:`str`
-        The starting timestamp of the optimization timeframe
-
-    endtime : :obj:`str`
-        The starting timestamp of the optimization timeframe
-
-    optimization_timeframe : :obj:`str`
-        The length of the overall optimization timeframe in years
-        (used for determining technology specific investment limits)
-
-    counter : :obj:`int`
-        number of rolling horizon iteration
-
-    transformers_init_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the existing capacities for the transformer
-        elements from prior myopic (Rolling horizon) iteration
-
-    years_per_timeslice : :obj:`int`
-        Number of years of a timeslice (a given myopic iteration); may differ
-        for the last timesteps since it does not necessarily have to be
-        completely covered
-
-    Returns
-    -------
-    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including
-        all source elements needed for the model run
-
-    new_built_transformer_labels : :obj:`list` of :class:`str`
-        A list containing the labels for potentially new built transformers;
-        only returned if myopic approach is chosen (RollingHorizon = True)
-
-    """
-    node_dict = create_existing_transformers(
-        input_data,
-        im,
-        node_dict,
-    )
-
-    if not im.rolling_horizon:
-
-        node_dict = create_new_built_transformers(
-            input_data,
-            im,
-            node_dict,
-        )
-
-        return node_dict
-
-    else:
-
-        (
-            node_dict,
-            new_built_transformer_labels,
-            endo_exo_exist_df,
-        ) = create_new_built_transformers_RH(
-            counter,
-            new_built_transformers_df,
-            transformers_init_df,
-            node_dict,
-            operation_costs_df,
-            investment_costs_df,
-            WACC_df,
-            cost_timeseries_df,
-            min_max_timeseries_df,
-            MaxInvest,
-            starttime,
-            endtime,
-            years_per_timeslice,
-            endyear,
-        )
-
-        return node_dict, new_built_transformer_labels, endo_exo_exist_df
-
-
 def create_existing_transformers(
     input_data,
     im,
@@ -882,7 +739,6 @@ def create_existing_transformers(
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Modified dictionary containing all nodes of the EnergySystem including
         the existing transformer elements
-
     """
     startyear_str = str(pd.to_datetime(im.starttime).year)
 
@@ -1041,8 +897,8 @@ def create_new_built_transformers(
     Returns
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
-
+        Modified dictionary containing all nodes of the EnergySystem including
+        the new-built transformer elements
     """
     for i, t in input_data["new_built_transformers"].iterrows():
 
@@ -1068,9 +924,9 @@ def create_new_built_transformers(
                 ]
             )
         else:
-            invest_max = float("inf")
+            invest_max = 10000000.0
 
-        # TODO: Define minimum investment reuirement for CHP units (also heat pumps etc as providers)
+        # TODO: Define minimum investment requirement for CHP units (also heat pumps etc as providers)
         minimum = (
             input_data["min_max_timeseries"].loc[im.starttime : im.endtime, (i, "min")]
         ).to_numpy()
@@ -1107,208 +963,123 @@ def create_new_built_transformers(
     return node_dict
 
 
-def create_new_built_transformers_RH(
-    counter,
+def create_new_built_transformers_rolling_horizon(
     input_data,
-    transformers_init_df,
+    im,
     node_dict,
-    operation_costs_df,
-    investment_costs_df,
-    WACC_df,
-    cost_timeseries_df,
-    min_max_timeseries_df,
-    MaxInvest,
-    starttime,
-    endtime,
-    years_per_timeslice,
-    endyear,
+    iteration_results,
 ):
-    """Function to create the potentially new built transformers elements
-    (i.e. investment alternatives for new built power plants)
-    by adding them to the dictionary of nodes used for the myopic modelling
-    approach.
+    """FCreate new-built transformers and add them to the dict of nodes
 
     New built units are modelled as power plant fleets per energy carrier /
     technology.
 
-    NOTE: There are two kinds of existing capacity:
-        - One being exogeneously determined and
-        - one being chosen endogeneously by the model itself (investments
-          from previous iterations).
-
     Parameters
     ----------
-    counter : :obj:`int`
-        number of rolling horizon iteration
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
 
-    input_data["new_built_transformers"] : :obj:`pd.DataFrame`
-        pd.DataFrame containing the potentially new built transformer elements
-        to be created (i.e. investment alternatives which may be invested in)
-
-    transformers_init_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the existing capacities for the transformer
-        elements from prior myopic (Rolling horizon) iteration
+    im : :class:`InvestmentModel`
+        The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
 
-    operation_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the operation costs data
-
-    investment_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the operation costs data
-
-    WACC_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the WACC data
-
-    cost_timeseries_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the cost timeseries data
-
-    min_max_timeseries_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing min resp. max output of a transformer as a
-        timeseries in order to deal with (exogeneously determined) commissions
-        or decommissions during runtime
-
-    starttime : :obj:`str`
-        The starting timestamp of the optimization timeframe
-
-    endtime : :obj:`str`
-        The end timestamp of the optimization timeframe
-
-    years_per_timeslice : :obj:`int`
-        Number of years of a timeslice (a given myopic iteration); may differ
-        for the last timesteps since it does not necessarily have to be
-        completely covered
+    iteration_results : dict
+        A dictionary holding the results of the previous rolling horizon
+        iteration
 
     Returns
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
-
-    new_built_transformer_labels : :obj:`list` of :class:`str
-        A list containing the labels for potentially new built transformers
-
+        Modified dictionary containing all nodes of the EnergySystem including
+        the new-built transformer elements
     """
-    startyear = pd.to_datetime(starttime).year
-
     # Use a list to store capacities installed for new built alternatives
     new_built_transformer_labels = []
+    # TODO: Move this df one or two levels up and simplify!
     endo_exo_exist_df = pd.DataFrame(
-        columns=["Existing_Capacity_endo", "old_exo"],
-        index=new_built_transformer_labels,
+        columns=["existing_capacity_endogenously", "old_capacity_exogenously"],
+        index=input_data["new_built_transformers"].index.values,
     )
 
     for i, t in input_data["new_built_transformers"].iterrows():
+
         new_built_transformer_labels.append(i)
 
-        exo_exist = calc_exist_cap(t, startyear, endyear, "existing_")
+        exo_exist = calc_exist_cap(t, im.startyear, im.endyear, "existing_")
 
-        if counter != 0:
-            # Obtain existing capacities from initial states DataFrame to increase existing capacity
+        if not iteration_results["new_built_transformers"].empty:
             existing_capacity = (
-                exo_exist + transformers_init_df.loc[i, "endo_cumulated"]
+                exo_exist
+                + iteration_results["new_built_transformers"].loc[
+                    i, "endogenous_capacity_cumulated"
+                ]
             )
-
         else:
             # Set existing capacity for 0th iteration
             existing_capacity = exo_exist
 
-        endo_exo_exist_df.loc[i, "old_exo"] = exo_exist
-        endo_exo_exist_df.loc[i, "Existing_Capacity_endo"] = (
+        endo_exo_exist_df.loc[i, "old_capacity_exogenously"] = exo_exist
+        endo_exo_exist_df.loc[i, "existing_capacity_endogenously"] = (
             existing_capacity - exo_exist
         )
 
         overall_invest_limit = t["overall_invest_limit"]
         annual_invest_limit = t["max_invest"]
 
+        max_bound_transformer = overall_invest_limit - existing_capacity
         if overall_invest_limit - existing_capacity <= 0:
             max_bound_transformer = 0
-        else:
-            max_bound_transformer = overall_invest_limit - existing_capacity
         # invest_max is the amount of capacity that can maximally be installed
         # within the optimization timeframe (including existing capacity)
-        if MaxInvest:
+        if (
+            not im.impose_investment_maxima
+            and "water" in i
+            or im.impose_investment_maxima
+        ):
             invest_max = np.min(
-                [max_bound_transformer, annual_invest_limit * years_per_timeslice]
+                [
+                    max_bound_transformer,
+                    annual_invest_limit * im.years_per_timeslice,
+                ]
             )
         else:
-            if "water" in i:
-                invest_max = np.min(
-                    [max_bound_transformer, annual_invest_limit * years_per_timeslice]
-                )
-            else:
-                invest_max = float("inf")
+            invest_max = 10000000.0
 
-        minimum = (min_max_timeseries_df.loc[starttime:endtime, (i, "min")]).to_numpy()
-        maximum = (min_max_timeseries_df.loc[starttime:endtime, (i, "max")]).to_numpy()
+        minimum = (
+            input_data["min_max_timeseries"].loc[im.starttime : im.endtime, (i, "min")]
+        ).to_numpy()
+        maximum = (
+            input_data["min_max_timeseries"].loc[im.starttime : im.endtime, (i, "max")]
+        ).to_numpy()
 
-        if t["Electricity"]:
-
-            outflow_args_el = {
-                # Operation costs per energy carrier / transformer type
-                "variable_costs": (
-                    cost_timeseries_df.loc[
-                        starttime:endtime, ("operation_costs", t["bus_technology"])
-                    ]
-                    * operation_costs_df.loc[t["bus_technology"], "2015"]
-                ).to_numpy(),
-                "min": minimum,
-                "max": maximum,
-                # NOTE: Ramping is not working in the investment mode
-                # TODO, JK / YW: Introduce a fix in oemof.solph itself... when you find the time for that
-                #                'positive_gradient': {'ub': t['grad_pos'], 'costs': t['ramp_costs']},
-                #                'negative_gradient': {'ub': t['grad_neg'], 'costs': t['ramp_costs']},
-                # NOTE: Outages are a historical relict from prior version (v0.0.9)
-                #                'outages': {t['outages'], 'period', 'output'}
-                # investment must be between investment limit applicable and
-                # already existing capacity (for myopic optimization)
-                "investment": solph.Investment(
-                    maximum=invest_max,
-                    # New built plants are installed at capacity costs for the start year
-                    # (of each myopic iteration = investment possibility)
-                    ep_costs=economics.annuity(
-                        capex=investment_costs_df.loc[t["bus_technology"], startyear],
-                        n=t["unit_lifetime"],
-                        wacc=WACC_df.loc[t["bus_technology"], startyear],
-                    ),
-                    existing=existing_capacity,
+        outflow_args_el = {
+            "variable_costs": (
+                input_data["operation_costs_ts"].loc[
+                    im.starttime : im.endtime, ("operation_costs", t["bus_technology"])
+                ]
+                * input_data["operation_costs"].loc[t["bus_technology"], "2020"]
+            ).to_numpy(),
+            "min": minimum,
+            "max": maximum,
+            "investment": solph.Investment(
+                maximum=invest_max,
+                # New built plants are installed at capacity costs for the start year
+                # (of each myopic iteration = investment possibility)
+                ep_costs=economics.annuity(
+                    capex=input_data["investment_costs"].loc[
+                        t["bus_technology"], im.startyear
+                    ],
+                    n=t["unit_lifetime"],
+                    wacc=input_data["wacc"].loc[t["bus_technology"], im.startyear],
                 ),
-            }
+                existing=existing_capacity,
+            ),
+        }
 
-            # dict outflow_args_th contains all keyword arguments that are
-            # identical for the thermal output of all CHP (and var_CHP) transformers.
-            outflow_args_th = {
-                # Substitute this through THERMAL capacity!
-                "nominal_value": existing_capacity,
-                # TODO: Check if variable costs are doubled for CHP plants!
-                "variable_costs": (
-                    cost_timeseries_df.loc[
-                        starttime:endtime, ("operation_costs", t["bus_technology"])
-                    ]
-                    * operation_costs_df.loc[t["bus_technology"], "2015"]
-                ).to_numpy(),
-                "min": minimum,
-                "max": maximum,
-            }
-
-            # Check if plant is a CHP plant (CHP = 1) in order to set efficiency parameters accordingly.
-            if t["CHP"]:
-                node_dict[i] = build_CHP_transformer(
-                    i, t, node_dict, outflow_args_el, outflow_args_th
-                )
-
-            # Check if plant is a variable CHP plant (i.e. an extraction turbine)
-            # and set efficiency parameters accordingly.
-            elif t["var_CHP"]:
-                node_dict[i] = build_var_CHP_transformer(
-                    i, t, node_dict, outflow_args_el, outflow_args_th
-                )
-
-            # Else, i.e. no CHP plant
-            else:
-                node_dict[i] = build_condensing_transformer(
-                    i, t, node_dict, outflow_args_el
-                )
+        node_dict[i] = build_condensing_transformer(i, t, node_dict, outflow_args_el)
 
     return node_dict, new_built_transformer_labels, endo_exo_exist_df
 
@@ -1427,143 +1198,6 @@ def new_transformers_exo(
     )
 
 
-def create_storages(
-    node_dict,
-    existing_storages_df,
-    new_built_storages_df,
-    RollingHorizon,
-    MaxInvest,
-    storage_var_costs_df,
-    storage_investment_costs_df,
-    storage_pump_investment_costs_df,
-    storage_turbine_investment_costs_df,
-    WACC_df,
-    starttime,
-    endyear,
-    optimization_timeframe=1,
-    counter=0,
-    storages_init_df=pd.DataFrame(),
-    years_per_timeslice=0,
-):
-    """Function to read in data from storages table and to create the storages elements
-    by adding them to the dictionary of nodes.
-
-    Parameters
-    ----------
-    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Dictionary containing all nodes of the EnergySystem
-
-    existing_storages_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the existing storages elements to be created
-
-    new_built_storages_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the potentially new built storages elements
-        to be created
-
-    RollingHorizon: :obj:`boolean`
-        If True a myopic (Rolling horizon) optimization run is carried out,
-        elsewhise a simple overall optimization approach is chosen
-
-    storage_var_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing variable costs for storages
-
-    storage_investment_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing investment costs for storages capacity
-
-    storage_pump_investment_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing investment costs for storages infeed
-
-    storage_turbine_investment_costs_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing investment costs forfor storages outfeed
-
-    WACC_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the WACC data
-
-    starttime : :obj:`str`
-        Starting time of the optimization run
-
-    optimization_timeframe : :obj:`str`
-        The length of the overall optimization timeframe in years
-        (used for determining technology specific investment limits)
-
-    Returns
-    -------
-    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
-
-    """
-    startyear = pd.to_datetime(starttime).year
-
-    # Create existing storages objects
-    for i, s in existing_storages_df.iterrows():
-        node_dict[i] = build_existing_storage(
-            i, s, node_dict, storage_var_costs_df, startyear
-        )
-
-    if not RollingHorizon:
-
-        # Create potentially new built storages objects
-        for i, s in new_built_storages_df.iterrows():
-            node_dict[i] = build_new_built_storage(
-                i,
-                s,
-                node_dict,
-                storage_var_costs_df,
-                storage_investment_costs_df,
-                storage_pump_investment_costs_df,
-                storage_turbine_investment_costs_df,
-                WACC_df,
-                MaxInvest,
-                startyear,
-                endyear,
-                optimization_timeframe,
-            )
-
-        return node_dict
-
-    else:
-
-        new_built_storage_labels = []
-        endo_exo_exist_stor_df = pd.DataFrame(
-            columns=[
-                "capacity_endo",
-                "old_exo_cap",
-                "turbine_endo",
-                "old_exo_turbine",
-                "pump_endo",
-                "old_exo_pump",
-            ],
-            index=new_built_storages_df.index.values,
-        )
-
-        # Create potentially new built storages objects
-        for i, s in new_built_storages_df.iterrows():
-
-            # Do not include thermal storage units (if there are any)
-            if not "_th" in i:
-                new_built_storage_labels.append(i)
-
-            node_dict[i], endo_exo_exist_stor_df = build_new_built_storage_RH(
-                counter,
-                i,
-                s,
-                storages_init_df,
-                node_dict,
-                storage_var_costs_df,
-                storage_investment_costs_df,
-                storage_pump_investment_costs_df,
-                storage_turbine_investment_costs_df,
-                WACC_df,
-                MaxInvest,
-                startyear,
-                endyear,
-                years_per_timeslice,
-                endo_exo_exist_stor_df,
-            )
-
-        return node_dict, new_built_storage_labels, endo_exo_exist_stor_df
-
-
 def create_existing_storages(input_data, im, node_dict):
     r"""Create existing storages and add them to the dict of nodes.
 
@@ -1652,6 +1286,104 @@ def create_existing_storages(input_data, im, node_dict):
     return node_dict
 
 
+def create_existing_storages_rolling_horizon(
+    input_data, im, node_dict, iteration_results
+):
+    r"""Create existing storages and add them to the dict of nodes.
+
+    Parameters
+    ----------
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
+
+    im : :class:`InvestmenthModel`
+        The investment model that is considered
+
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Dictionary containing all nodes of the EnergySystem
+
+    iteration_results : dict
+        A dictionary holding the results of the previous rolling horizon
+        iteration
+
+    Returns
+    -------
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Modified dictionary containing all nodes of the EnergySystem
+        including the storage elements
+    """
+    existing_storage_labels = []
+
+    for i, s in input_data["storages_el"].iterrows():
+
+        existing_storage_labels.append(i)
+        if not iteration_results["storages_initial"].empty:
+            initial_storage_level_last_iteration = (
+                iteration_results["storages_initial"].loc[
+                    i, "initial_storage_level_last_iteration"
+                ]
+                / s["nominal_storable_energy"]
+            )
+        else:
+            initial_storage_level_last_iteration = s["initial_storage_level"]
+
+        if s["type"] == "phes":
+            node_dict[i] = solph.components.GenericStorage(
+                label=i,
+                inputs={
+                    node_dict[s["bus_inflow"]]: solph.flows.Flow(
+                        nominal_value=s["capacity_pump"],
+                        variable_costs=(
+                            input_data["costs_operation_storages"].loc[i, im.year]
+                        ),
+                    )
+                },
+                outputs={
+                    node_dict[s["bus_outflow"]]: solph.flows.Flow(
+                        nominal_value=s["capacity_turbine"],
+                        variable_costs=(
+                            input_data["costs_operation_storages"].loc[i, im.year]
+                        ),
+                    )
+                },
+                nominal_storage_capacity=s["nominal_storable_energy"],
+                loss_rate=s["loss_rate"],
+                initial_storage_level=initial_storage_level_last_iteration,
+                max_storage_level=s["max_storage_level"],
+                min_storage_level=s["min_storage_level"],
+                inflow_conversion_factor=s["efficiency_pump"],
+                outflow_conversion_factor=s["efficiency_turbine"],
+                balanced=True,
+            )
+
+        if s["type"] == "reservoir":
+            node_dict[i] = solph.components.GenericStorage(
+                label=i,
+                inputs={node_dict[s["bus_inflow"]]: solph.flows.Flow()},
+                outputs={
+                    node_dict[s["bus_outflow"]]: solph.flows.Flow(
+                        nominal_value=s["capacity_turbine"],
+                        variable_costs=(
+                            input_data["costs_operation_storages"].loc[i, im.year]
+                        ),
+                        min=s["min_load_factor"],
+                        max=s["max_load_factor"],
+                    )
+                },
+                nominal_storage_capacity=s["nominal_storable_energy"],
+                loss_rate=s["loss_rate"],
+                initial_storage_level=initial_storage_level_last_iteration,
+                max_storage_level=s["max_storage_level"],
+                min_storage_level=s["min_storage_level"],
+                inflow_conversion_factor=s["efficiency_pump"],
+                outflow_conversion_factor=s["efficiency_turbine"],
+                balanced=True,
+            )
+
+    return node_dict, existing_storage_labels
+
+
 def create_new_built_storages(
     input_data,
     im,
@@ -1661,42 +1393,21 @@ def create_new_built_storages(
 
     Parameters
     ----------
-    i : :obj:`str`
-        label of current transformer (within iteration)
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
 
-    s : :obj:`pd.Series`
-        pd.Series containing attributes for storage component (row-wise data entries)
+    im : :class:`InvestmenthModel`
+        The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
 
-    storage_var_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage variable costs
-
-    storage_investment_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage investment costs
-
-    storage_pump_investment_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage pump investment costs
-
-    storage_turbine_investment_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage turbine investment costs
-
-    WACC_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the WACC data
-
-    startyear : :obj:`int`
-        The startyear of the optimization timeframe
-
-    optimization_timeframe : :obj:`str`
-        The length of the overall optimization timeframe in years
-        (used for determining technology specific investment limits)
-
     Returns
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
-
+        Modified dictionary containing all nodes of the EnergySystem
+        including the storage elements
     """
     for i, s in input_data["new_built_storages"].iterrows():
         # Add upcoming commissioned capacity to existing
@@ -1731,9 +1442,9 @@ def create_new_built_storages(
                 [max_bound3, annual_invest_limit * im.optimization_timeframe]
             )
         else:
-            invest_max_pump = float("inf")
-            invest_max_turbine = float("inf")
-            invest_max = float("inf")
+            invest_max_pump = 10000000.0
+            invest_max_turbine = 10000000.0
+            invest_max = 10000000.0
 
         wacc = input_data["wacc"].loc[i, im.startyear]
 
@@ -1743,7 +1454,7 @@ def create_new_built_storages(
                 node_dict[s["bus"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_operation_storages"].loc[i, 2020]
-                        * input_data["costs_operation_storages"].loc[
+                        * input_data["costs_operation_storages_ts"].loc[
                             im.starttime : im.endtime, i
                         ]
                     ).to_numpy(),
@@ -1765,7 +1476,7 @@ def create_new_built_storages(
                 node_dict[s["bus"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_operation_storages"].loc[i, 2020]
-                        * input_data["costs_operation_storages"].loc[
+                        * input_data["costs_operation_storages_ts"].loc[
                             im.starttime : im.endtime, i
                         ]
                     ).to_numpy(),
@@ -1805,217 +1516,206 @@ def create_new_built_storages(
     return node_dict
 
 
-def build_new_built_storage_RH(
-    counter,
-    i,
-    s,
-    storages_init_df,
+def create_new_built_storages_rolling_horizon(
+    input_data,
+    im,
     node_dict,
-    storage_var_costs_df,
-    storage_investment_costs_df,
-    storage_pump_investment_costs_df,
-    storage_turbine_investment_costs_df,
-    WACC_df,
-    MaxInvest,
-    startyear,
-    endyear,
-    years_per_timeslice,
-    endo_exo_exist_stor_df,
+    iteration_results,
 ):
-    """Function used to actually build investment storage elements
-    (new built units only).
-    Function is called by create_invest_storages as well as by
-    create_invest_storages_RH.
-    Separate function definition in order to increase code readability.
+    """Create new-built storages and add them to the dict of nodes
 
     Parameters
     ----------
-    counter : :obj:`int`
-        number of rolling horizon iteration
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
 
-    i : :obj:`str`
-        label of current transformer (within iteration)
-
-    s : :obj:`pd.Series`
-        pd.Series containing attributes for storage component (row-wise data entries)
-
-    storages_init_df : :obj;`pd.DataFrame`
-        pd.DataFrame containing the storage states from previous iterations
-        as well as the already existing capacity
+    im : :class:`InvestmenthModel`
+        The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
 
-    storage_var_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage variable costs
-
-    storage_investment_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage investment costs
-
-    storage_pump_investment_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage pump investment costs
-
-    storage_turbine_investment_costs_df : :obj:`pd.DataFrame`
-        A pd.DataFrame containing the storage turbine investment costs
-
-    WACC_df : :obj:`pd.DataFrame`
-        pd.DataFrame containing the WACC data
-
-    startyear : :obj:`int`
-        The startyear of the optimization timeframe
-
-    years_per_timeslice : :obj:`int`
-        Number of years of a timeslice (a given myopic iteration); may differ
-        for the last timesteps since it does not necessarily have to be
-        completely covered
+    iteration_results : dict
+        A dictionary holding the results of the previous rolling horizon
+        iteration
 
     Returns
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
-        Modified dictionary containing all nodes of the EnergySystem including the demand sink elements
-
+        Modified dictionary containing all nodes of the EnergySystem
+        including the storage elements
     """
-    # Get values from previous iteration
-    exo_exist_pump = calc_exist_cap(s, startyear, endyear, "existing_pump_")
-    exo_exist_turbine = calc_exist_cap(s, startyear, endyear, "existing_turbine_")
-    exo_exist_cap = calc_exist_cap(s, startyear, endyear, "existing_")
-
-    if counter != 0:
-        # Obtain capacity for last timestep as well as existing capacities
-        # from storages_init_df and calculate initial capacity (in percent)
-        # Capacities equal to the existing ones + new installations
-
-        # First set new existing parameters in order to calculate storage state
-        # for the new existing storage energy.
-        existing_pump = (
-            exo_exist_pump + storages_init_df.loc[i, "Existing_Inflow_Power"]
-        )
-        existing_turbine = (
-            exo_exist_turbine + storages_init_df.loc[i, "Existing_Outflow_Power"]
-        )
-        existing = exo_exist_cap + storages_init_df.loc[i, "Existing_Capacity_Storage"]
-
-    else:
-        # Set values for 0th iteration (empty DataFrame)
-        existing_pump = exo_exist_pump
-        existing_turbine = exo_exist_turbine
-        existing = exo_exist_cap
-
-    # Prevent potential zero division for storage states
-    if existing != 0:
-        initial_storage_level_last = (
-            storages_init_df.loc[i, "Capacity_Last_Timestep"] / existing
-        )
-    else:
-        initial_storage_level_last = s["initial_storage_level"]
-
-    endo_exo_exist_stor_df.loc[i, "old_exo_cap"] = exo_exist_cap
-    endo_exo_exist_stor_df.loc[i, "old_exo_turbine"] = exo_exist_turbine
-    endo_exo_exist_stor_df.loc[i, "old_exo_pump"] = exo_exist_pump
-
-    endo_exo_exist_stor_df.loc[i, "capacity_endo"] = existing - exo_exist_cap
-    endo_exo_exist_stor_df.loc[i, "turbine_endo"] = existing_turbine - exo_exist_turbine
-    endo_exo_exist_stor_df.loc[i, "pump_endo"] = existing_pump - exo_exist_pump
-
-    # overall invest limit is the amount of capacity that can at maximum be installed
-    # i.e. the potential limit of a given technology
-    overall_invest_limit_pump = s["overall_invest_limit_pump"]
-    overall_invest_limit_turbine = s["overall_invest_limit_turbine"]
-    overall_invest_limit = s["overall_invest_limit"]
-
-    annual_invest_limit_pump = s["max_invest_pump"]
-    annual_invest_limit_turbine = s["max_invest_turbine"]
-    annual_invest_limit = s["max_invest"]
-
-    if overall_invest_limit_pump - existing_pump <= 0:
-        max_bound1 = 0
-    else:
-        max_bound1 = overall_invest_limit_pump - existing_pump
-
-    if overall_invest_limit_turbine - existing_turbine <= 0:
-        max_bound2 = 0
-    else:
-        max_bound2 = overall_invest_limit_turbine - existing_turbine
-
-    if overall_invest_limit - existing <= 0:
-        max_bound3 = 0
-    else:
-        max_bound3 = overall_invest_limit - existing
-
-    # invest_max is the amount of capacity that can maximally be installed
-    # within the optimization timeframe
-    if MaxInvest:
-        invest_max_pump = np.min(
-            [max_bound1, annual_invest_limit_pump * years_per_timeslice]
-        )
-        invest_max_turbine = np.min(
-            [max_bound2, annual_invest_limit_turbine * years_per_timeslice]
-        )
-        invest_max = np.min([max_bound3, annual_invest_limit * years_per_timeslice])
-    else:
-        invest_max_pump = float("inf")
-        invest_max_turbine = float("inf")
-        invest_max = float("inf")
-
-    wacc = WACC_df.loc[i, startyear]
-
-    node_dict[i] = solph.components.GenericStorage(
-        label=i,
-        inputs={
-            node_dict[s["bus"]]: solph.flows.Flow(
-                variable_costs=storage_var_costs_df.loc[i, startyear],
-                max=s["max_storage_level"],
-                investment=solph.Investment(
-                    maximum=invest_max_pump,
-                    # TODO, JK/YW: Julien added a division of capex by 120 here... Find out why!
-                    # 31.03.2020, JK: I assume this to be a relict from a hard code test which has not been cleaned up...
-                    # ep_costs=economics.annuity(capex=storage_pump_investment_costs_df.loc[i, startyear] / 120
-                    ep_costs=economics.annuity(
-                        capex=storage_pump_investment_costs_df.loc[i, startyear],
-                        n=s["unit_lifetime_pump"],
-                        wacc=wacc,
-                    ),
-                    existing=existing_pump,
-                ),
-            )
-        },
-        outputs={
-            node_dict[s["bus"]]: solph.Flow(
-                variable_costs=storage_var_costs_df.loc[i, startyear],
-                max=s["max_storage_level"],
-                investment=solph.Investment(
-                    maximum=invest_max_turbine,
-                    ep_costs=economics.annuity(
-                        capex=storage_turbine_investment_costs_df.loc[i, startyear],
-                        n=s["unit_lifetime_turbine"],
-                        wacc=wacc,
-                    ),
-                    existing=existing_turbine,
-                ),
-            )
-        },
-        loss_rate=s["loss_rate"] * s["max_storage_level"],
-        initial_storage_level=initial_storage_level_last,
-        balanced=True,
-        max_storage_level=s["max_storage_level"],
-        min_storage_level=s["min_storage_level"],
-        invest_relation_input_output=s["invest_relation_input_output"],
-        invest_relation_input_capacity=s["invest_relation_input_capacity"],
-        invest_relation_output_capacity=s["invest_relation_output_capacity"],
-        inflow_conversion_factor=s["efficiency_pump"],
-        outflow_conversion_factor=s["efficiency_turbine"],
-        investment=solph.Investment(
-            maximum=invest_max,
-            ep_costs=economics.annuity(
-                capex=storage_investment_costs_df.loc[i, startyear],
-                n=s["unit_lifetime"],
-                wacc=wacc,
-            ),
-            existing=existing,
-        ),
+    new_built_storage_labels = []
+    # TODO: Move this df one or two levels up and simplify!
+    endo_exo_exist_stor_df = pd.DataFrame(
+        columns=[
+            "capacity_endo",
+            "old_exo_cap",
+            "turbine_endo",
+            "old_exo_turbine",
+            "pump_endo",
+            "old_exo_pump",
+        ],
+        index=input_data["new_built_storages"].index.values,
     )
 
-    return node_dict[i], endo_exo_exist_stor_df
+    for i, s in input_data["new_built_storages"].iterrows():
+
+        new_built_storage_labels.append(i)
+        # Get values from previous iteration
+        exo_exist_pump = calc_exist_cap(s, im.startyear, im.endyear, "existing_pump_")
+        exo_exist_turbine = calc_exist_cap(
+            s, im.startyear, im.endyear, "existing_turbine_"
+        )
+        exo_exist_cap = calc_exist_cap(s, im.startyear, im.endyear, "existing_")
+
+        if not iteration_results["storages_new_built"].empty:
+            existing_pump = (
+                exo_exist_pump
+                + iteration_results["storages_new_built"].loc[
+                    i, "existing_inflow_power"
+                ]
+            )
+            existing_turbine = (
+                exo_exist_turbine
+                + iteration_results["storages_new_built"].loc[
+                    i, "existing_outflow_power"
+                ]
+            )
+            existing = (
+                exo_exist_cap
+                + iteration_results["storages_new_built"].loc[
+                    i, "existing_capacity_storage"
+                ]
+            )
+
+        else:
+            # Set values for 0th iteration (empty DataFrame)
+            existing_pump = exo_exist_pump
+            existing_turbine = exo_exist_turbine
+            existing = exo_exist_cap
+
+        # Prevent potential zero division for storage states
+        if existing != 0:
+            initial_storage_level_last_iteration = (
+                iteration_results["storages_new_built"].loc[
+                    i, "initial_storage_level_last_iteration"
+                ]
+                / existing
+            )
+        else:
+            initial_storage_level_last_iteration = s["initial_storage_level"]
+
+        endo_exo_exist_stor_df.loc[i, "old_exo_cap"] = exo_exist_cap
+        endo_exo_exist_stor_df.loc[i, "old_exo_turbine"] = exo_exist_turbine
+        endo_exo_exist_stor_df.loc[i, "old_exo_pump"] = exo_exist_pump
+
+        endo_exo_exist_stor_df.loc[i, "capacity_endo"] = existing - exo_exist_cap
+        endo_exo_exist_stor_df.loc[i, "turbine_endo"] = (
+            existing_turbine - exo_exist_turbine
+        )
+        endo_exo_exist_stor_df.loc[i, "pump_endo"] = existing_pump - exo_exist_pump
+
+        # overall invest limit is the amount of capacity that can at maximum be installed
+        # i.e. the potential limit of a given technology
+        overall_invest_limit_pump = s["overall_invest_limit_pump"]
+        overall_invest_limit_turbine = s["overall_invest_limit_turbine"]
+        overall_invest_limit = s["overall_invest_limit"]
+
+        annual_invest_limit_pump = s["max_invest_pump"]
+        annual_invest_limit_turbine = s["max_invest_turbine"]
+        annual_invest_limit = s["max_invest"]
+
+        max_bound1 = max(overall_invest_limit_pump - existing_pump, 0)
+        max_bound2 = max(overall_invest_limit_turbine - existing_turbine, 0)
+        max_bound3 = max(overall_invest_limit - existing, 0)
+
+        # invest_max is the amount of capacity that can maximally be installed
+        # within the optimization timeframe
+        if im.impose_investment_maxima:
+            invest_max_pump = np.min(
+                [max_bound1, annual_invest_limit_pump * im.years_per_timeslice]
+            )
+            invest_max_turbine = np.min(
+                [max_bound2, annual_invest_limit_turbine * im.years_per_timeslice]
+            )
+            invest_max = np.min(
+                [max_bound3, annual_invest_limit * im.years_per_timeslice]
+            )
+        else:
+            invest_max_pump = 10000000.0
+            invest_max_turbine = 10000000.0
+            invest_max = 10000000.0
+
+        node_dict[i] = solph.components.GenericStorage(
+            label=i,
+            inputs={
+                node_dict[s["bus"]]: solph.flows.Flow(
+                    variable_costs=(
+                        input_data["costs_operation_storages"].loc[i, 2020]
+                        * input_data["costs_operation_storages_ts"].loc[
+                            im.starttime : im.endtime, i
+                        ]
+                    ).to_numpy(),
+                    max=s["max_storage_level"],
+                    investment=solph.Investment(
+                        maximum=invest_max_pump,
+                        ep_costs=economics.annuity(
+                            capex=input_data["costs_storages_investment"].loc[
+                                i + "_pump", im.startyear
+                            ],
+                            n=s["unit_lifetime_pump"],
+                            wacc=input_data["wacc"].loc[i, im.startyear],
+                        ),
+                        existing=existing_pump,
+                    ),
+                )
+            },
+            outputs={
+                node_dict[s["bus"]]: solph.flows.Flow(
+                    variable_costs=(
+                        input_data["costs_operation_storages"].loc[i, 2020]
+                        * input_data["costs_operation_storages_ts"].loc[
+                            im.starttime : im.endtime, i
+                        ]
+                    ).to_numpy(),
+                    max=s["max_storage_level"],
+                    investment=solph.Investment(
+                        maximum=invest_max_turbine,
+                        ep_costs=economics.annuity(
+                            capex=input_data["costs_storages_investment"].loc[
+                                i + "_turbine", im.startyear
+                            ],
+                            n=s["unit_lifetime_turbine"],
+                            wacc=input_data["wacc"].loc[i, im.startyear],
+                        ),
+                        existing=existing_turbine,
+                    ),
+                )
+            },
+            loss_rate=s["loss_rate"] * s["max_storage_level"],
+            initial_storage_level=initial_storage_level_last_iteration,
+            balanced=True,
+            max_storage_level=s["max_storage_level"],
+            min_storage_level=s["min_storage_level"],
+            inflow_conversion_factor=s["efficiency_pump"],
+            outflow_conversion_factor=s["efficiency_turbine"],
+            invest_relation_input_output=s["invest_relation_input_output"],
+            invest_relation_input_capacity=s["invest_relation_input_capacity"],
+            invest_relation_output_capacity=s["invest_relation_output_capacity"],
+            investment=solph.Investment(
+                maximum=invest_max,
+                ep_costs=economics.annuity(
+                    capex=input_data["costs_storages_investment"].loc[i, im.startyear],
+                    n=s["unit_lifetime"],
+                    wacc=input_data["wacc"].loc[i, im.startyear],
+                ),
+                existing=existing,
+            ),
+        )
+
+    return node_dict, new_built_storage_labels, endo_exo_exist_stor_df
 
 
 def storages_exo(

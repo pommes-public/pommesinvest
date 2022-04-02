@@ -22,10 +22,10 @@ import math
 from oemof.solph import constraints, views, models, network, processing
 from oemof.tools import logger
 
-from pommesdispatch.model_funcs import helpers
-from pommesdispatch.model_funcs.data_input import (
+from pommesinvest.model_funcs import helpers
+from pommesinvest.model_funcs.data_input import (
     nodes_from_csv,
-    nodes_from_csv_rh,
+    nodes_from_csv_rolling_horizon,
 )
 import warnings
 
@@ -33,24 +33,25 @@ import pandas as pd
 import math
 import logging
 
-# from oemof import solph, outputlib
 import oemof.solph as solph
 
-from data_input import nodes_from_excel, nodes_from_excel_rh
 
-from helper_functions_invest import MultipleLeapYears
+FREQUENCY_TO_TIMESTEPS = {
+    "60min": {"timesteps": 8760, "multiplicator": 1},
+    "4H": {"timesteps": 2190, "multiplicator": 4},
+    "8H": {"timesteps": 1095, "multiplicator": 8},
+    "24H": {"timesteps": 365, "multiplicator": 24},
+    "36H": {"timesteps": 244, "multiplicator": 36},
+    "48H": {"timesteps": 182, "multiplicator": 48},
+}
 
 
 def show_meta_logging_info(model_meta):
     """Show some logging information on model meta data"""
     logging.info("***** MODEL RUN TERMINATED SUCCESSFULLY :-) *****")
-    logging.info(
-        "Overall objective value: " + f"{model_meta['overall_objective']:,.0f}"
-    )
-    logging.info(
-        "Overall solution time: " + f"{model_meta['overall_solution_time']:.2f}"
-    )
-    logging.info("Overall time: " + f"{model_meta['overall_time']:.2f}")
+    logging.info(f"Overall objective value: {model_meta['overall_objective']:,.0f}")
+    logging.info(f"Overall solution time: {model_meta['overall_solution_time']:.2f}")
+    logging.info(f"Overall time: {model_meta['overall_time']:.2f}")
 
 
 class InvestmentModel(object):
@@ -157,6 +158,9 @@ class InvestmentModel(object):
             | according to medium estimate", "| medium estimate,
             | values until 2050"
 
+    investment_cost_pathway : str
+        A predefined pathway for investment cost development until 2050
+
     activate_emissions_limit : boolean
         boolean control variable indicating whether to introduce an overall
         emissions limit
@@ -234,6 +238,7 @@ class InvestmentModel(object):
         self.solver = None
         self.fuel_cost_pathway = None
         self.emissions_cost_pathway = None
+        self.investment_cost_pathway = None
         self.activate_emissions_limit = None
         self.emissions_pathway = None
         self.activate_demand_response = None
@@ -248,9 +253,6 @@ class InvestmentModel(object):
         self.path_folder_input = None
         self.path_folder_output = None
         self.om = None
-
-        # TODO: Set startyear and endyear
-        startyear = pd.to_datetime(self.starttime).year
 
     def update_model_configuration(self, *model_parameters, nolog=False):
         """Set the main model parameters by extracting them from dicts
@@ -276,28 +278,39 @@ class InvestmentModel(object):
                             + "to the model."
                         )
                 setattr(self, k, v)
+                if k == "freq":
+                    self.set_multiplicator()
 
         if hasattr(self, "start_time"):
             setattr(self, "start_year", str(pd.to_datetime(self.start_time).year))
         if hasattr(self, "end_time"):
-            setattr(self, "start_year", str(pd.to_datetime(self.end_time).year))
+            setattr(self, "end_year", str(pd.to_datetime(self.end_time).year))
+
+    def set_multiplicator(self):
+        """Set multiplicator and timesteps dependent on frequency attribute"""
+        self.multiplicator = FREQUENCY_TO_TIMESTEPS[self.freq]["multiplicator"]
 
     def check_model_configuration(self):
         """Checks if any necessary model parameter hasn't been set yet"""
         missing_parameters = []
 
         for entry in dir(self):
-            if not entry.startswith("_"):
-                if entry != "om" and getattr(self, entry) is None:
-                    missing_parameters.append(entry)
-                    logging.warning(
-                        f"Necessary model parameter `{entry}` "
-                        + "has not yet been specified!"
-                    )
+            if (
+                not entry.startswith("_")
+                and entry != "om"
+                and getattr(self, entry) is None
+            ):
+                missing_parameters.append(entry)
+                logging.warning(
+                    f"Necessary model parameter `{entry}` "
+                    + "has not yet been specified!"
+                )
             if entry == "fuel_cost_pathway":
                 logging.info(f"Using fuel cost pathway: {getattr(self, entry)}")
             elif entry == "emissions_cost_pathway":
                 logging.info(f"Using emissions cost pathway: {getattr(self, entry)}")
+            elif entry == "investment_cost_pathway":
+                logging.info(f"Using investment cost pathway: {getattr(self, entry)}")
 
         return missing_parameters
 
@@ -317,18 +330,22 @@ class InvestmentModel(object):
 
         setattr(self, "time_series_start", pd.Timestamp(self.start_time, self.freq))
         setattr(self, "time_series_end", pd.Timestamp(self.end_time, self.freq))
+
         setattr(
             self,
             "time_slice_length_wo_overlap_in_time_steps",
             (
-                {"60min": 1, "15min": 4}[self.freq]
-                * getattr(self, "time_slice_length_wo_overlap_in_hours")
+                FREQUENCY_TO_TIMESTEPS[self.freq]["timesteps"]
+                * getattr(self, "myopic_horizon_in_years")
             ),
         )
         setattr(
             self,
             "overlap_in_time_steps",
-            ({"60min": 1, "15min": 4}[self.freq] * getattr(self, "overlap_in_hours")),
+            (
+                FREQUENCY_TO_TIMESTEPS[self.freq]["timesteps"]
+                * getattr(self, "overlap_in_years")
+            ),
         )
         setattr(
             self,
@@ -389,11 +406,7 @@ class InvestmentModel(object):
         if self.aggregate_input:
             agg_string = "Using the AGGREGATED POWER PLANT DATA SET"
         else:
-            agg_string = (
-                "Using the COMPLETE POWER PLANT DATA SET.\n"
-                "Minimum power output constraint of (individual)\n"
-                "transformers will be neglected."
-            )
+            agg_string = "Using the COMPLETE POWER PLANT DATA SET."
 
         if self.activate_demand_response:
             dr_string = (
@@ -417,14 +430,14 @@ class InvestmentModel(object):
         not including any measures for complexity reduction.
         """
         logging.info("Starting optimization")
-        logging.info("Running a DISPATCH OPTIMIZATION")
+        logging.info("Running an integrated INVESTMENT AND DISPATCH OPTIMIZATION")
 
         datetime_index = pd.date_range(self.start_time, self.end_time, freq=self.freq)
         es = network.EnergySystem(timeindex=datetime_index)
 
         nodes_dict, emissions_limit = nodes_from_csv(self)
 
-        logging.info("Creating a LP model for DISPATCH OPTIMIZATION.")
+        logging.info("Creating a LP model for INVESTMENT AND DISPATCH OPTIMIZATION.")
 
         es.add(*nodes_dict.values())
         setattr(self, "om", models.Model(es))
@@ -471,7 +484,7 @@ class InvestmentModel(object):
 
         # Emissions limit is imposed for flows from commodity source to bus
         emission_flow_labels = [
-            country + "_bus_" + fuel for country in countries for fuel in fuels
+            f"{country}_bus_{fuel}" for country in countries for fuel in fuels
         ]
 
         emission_flows = {}
@@ -485,104 +498,6 @@ class InvestmentModel(object):
                 self.om, flows=emission_flows, limit=emissions_limit
             )
             logging.info(f"Adding an EMISSIONS LIMIT of {emissions_limit} t CO2")
-
-    def get_power_prices_from_duals(self):
-        r"""Obtain the power price results for the dispatch model
-
-        The power prices are obtained from the dual value of the
-        Bus.balance constraint of the German electricity bus.
-
-        Returns
-        -------
-        power_prices: :obj:`pd.DataFrame`
-        """
-        constr = self.om.Bus.balance
-
-        power_prices_list = [
-            self.om.dual[constr[index]]
-            for index in constr
-            if index[0].label == "DE_bus_el"
-        ]
-        power_prices = pd.DataFrame(
-            data=power_prices_list,
-            index=self.om.es.timeindex,
-            columns=["Power price"],
-        )
-
-        return power_prices
-
-    def calculate_market_values_from_model(
-        self,
-        power_prices,
-    ):
-        r"""Calculate market values from exogenous feed-in and power prices
-
-        Market values are obtained from a prior run of pommesdispatch
-
-        Parameters
-        ----------
-        power_prices : :obj:`pd.DataFrame`
-            DataFrame containing the power prices obtained from
-            the dispatch model
-
-        Returns
-        -------
-        market_values : :obj:`pd.DataFrame`
-            monthly market values for renewables
-        market_values_hourly : :obj:`pd.DataFrame`
-            monthly market values for renewables rolled
-            out over each hour of a given month
-        """
-        log_info = "Saving updated market values from model run."
-        logging.info(log_info)
-        techs = ["DE_bus_solarPV", "DE_bus_windonshore", "DE_bus_windoffshore"]
-        feedin_df = pd.read_csv(
-            (self.path_folder_input + "sources_renewables_ts_" + self.year + ".csv"),
-            index_col=0,
-            parse_dates=True,
-        )[techs]
-
-        # Create new DataFrame before manipulating the original data
-        market_values_hourly = pd.DataFrame(
-            index=feedin_df.index, columns=feedin_df.columns
-        )
-        market_values = pd.DataFrame(index=range(1, 13), columns=feedin_df.columns)
-
-        feedin_df.loc[:, "power_price"] = 0
-        feedin_df.loc[power_prices.index, "power_price"] = power_prices[
-            "Power price"
-        ].values
-
-        if power_prices["Power price"].values.shape[0] < 8760:
-            msg = (
-                "Timehorizon of the model is less than a year."
-                " Market values will be incorrect."
-            )
-            warnings.warn(msg)
-
-        feedin_df["month"] = feedin_df.index.month
-
-        for month in range(1, 13):
-            for tech in techs:
-                market_values.loc[month, tech] = (
-                    sum(
-                        feedin_df.loc[feedin_df["month"] == month, tech].values
-                        * feedin_df.loc[
-                            feedin_df["month"] == month, "power_price"
-                        ].values
-                    )
-                    / feedin_df.loc[feedin_df["month"] == month, tech].sum()
-                )
-
-                market_values_hourly.loc[
-                    feedin_df["month"] == month, tech
-                ] = market_values.loc[month, tech]
-
-            market_values.loc[month, "EPEX"] = feedin_df.loc[
-                feedin_df["month"] == month, "power_price"
-            ].mean()
-
-        return market_values, market_values_hourly
 
     def build_rolling_horizon_model(self, counter, iteration_results):
         r"""Set up and return a rolling horizon LP dispatch model
@@ -600,17 +515,6 @@ class InvestmentModel(object):
             A dictionary holding the results of the previous rolling horizon
             iteration
         """
-        setattr(
-            self,
-            "time_series_end",
-            (
-                getattr(self, "time_series_start")
-                + pd.to_timedelta(
-                    getattr(self, "time_slice_length_wo_overlap_in_hours"), "h"
-                )
-            ),
-        )
-
         logging.info(f"Starting optimization for optimization run {counter}")
         logging.info(
             f"Start of iteration {counter}: " + f"{getattr(self, 'time_series_start')}"
@@ -626,12 +530,16 @@ class InvestmentModel(object):
         )
         es = network.EnergySystem(timeindex=datetime_index)
 
-        node_dict, emissions_limit, storage_labels = nodes_from_csv_rh(
-            self, iteration_results
-        )
-        # Only set storage labels attribute for the 0th iteration
-        if not hasattr(self, "storage_labels"):
-            setattr(self, "storage_labels", storage_labels)
+        (
+            node_dict,
+            emissions_limit,
+            storage_and_transformer_labels,
+        ) = nodes_from_csv_rolling_horizon(self, iteration_results)
+        # Only set storage and transformer labels attribute for the 0th iteration
+        if not hasattr(self, "storage_and_transformer_labels"):
+            setattr(
+                self, "storage_and_transformer_labels", storage_and_transformer_labels
+            )
 
         # Update model start time for the next iteration
         setattr(self, "time_series_start", getattr(self, "time_series_end"))
@@ -664,17 +572,11 @@ class InvestmentModel(object):
         no_solver_log : boolean
             Show no solver logging if set to True
         """
-        self.om.receive_duals()
-        logging.info(
-            "Obtaining dual values and reduced costs from the model \n"
-            "in order to calculate power prices."
-        )
-
         if self.write_lp_file:
             self.om.write(
                 (
                     self.path_folder_output
-                    + "pommesdispatch_model_iteration_"
+                    + "pommesinvest_model_iteration_"
                     + str(counter)
                     + ".lp"
                 ),
@@ -700,6 +602,7 @@ class InvestmentModel(object):
         iter_results["dispatch_results"] = iter_results["dispatch_results"].append(
             sliced_dispatch_results
         )
+        iter_results["investment_results"] = electricity_bus["scalars"]
 
         meta_results = processing.meta_results(self.om)
         # Objective is weighted in order to take overlap into account
@@ -711,10 +614,6 @@ class InvestmentModel(object):
             )
         )
         model_meta["overall_solution_time"] += meta_results["solver"]["Time"]
-        pps = self.get_power_prices_from_duals().iloc[
-            0 : getattr(self, "time_slice_length_wo_overlap_in_time_steps")
-        ]
-        iter_results["power_prices"] = iter_results["power_prices"].append(pps)
 
     def retrieve_initial_states_rolling_horizon(self, iteration_results):
         r"""Retrieve the initial states for the upcoming rolling horizon run
@@ -725,19 +624,50 @@ class InvestmentModel(object):
             A dictionary holding the results of the previous rolling horizon
             iteration
         """
-        iteration_results["storages_initial"] = pd.DataFrame(
+        iteration_results["storages_existing"] = pd.DataFrame(
             columns=["initial_storage_level_last_iteration"],
-            index=getattr(self, "storage_labels"),
+            index=getattr(self, "existing_storage_labels"),
         )
 
-        for i, s in iteration_results["storages_initial"].iterrows():
+        for i, s in iteration_results["storages_existing"].iterrows():
             storage = views.node(iteration_results["model_results"], i)
 
-            iteration_results["storages_initial"].at[
+            iteration_results["storages_existing"].at[
                 i, "initial_storage_level_last_iteration"
             ] = storage["sequences"][((i, "None"), "storage_content")].iloc[
                 getattr(self, "time_slice_length_wo_overlap_in_time_steps") - 1
             ]
+
+        iteration_results["storages_new_built"] = pd.DataFrame(
+            columns=[
+                "initial_storage_level_last_iteration",
+                "existing_inflow_power",
+                "existing_outflow_power",
+                "existing_capacity_storage",
+            ],
+            index=getattr(self, "new_built_storage_labels"),
+        )
+
+        for i, s in iteration_results["storages_new_built"].iterrows():
+            storage = views.node(iteration_results["model_results"], i)
+
+            iteration_results["storages_new_built"].at[
+                i, "initial_storage_level_last_iteration"
+            ] = storage["sequences"][((i, "None"), "storage_content")].iloc[
+                getattr(self, "time_slice_length_wo_overlap_in_time_steps") - 1
+            ]
+
+            iteration_results["storages_new_built"].at[
+                i, "existing_inflow_power"
+            ] = storage["scalars"].loc[(("DE_bus_el", i), "invest")]
+
+            iteration_results["storages_new_built"].at[
+                i, "existing_outflow_power"
+            ] = storage["scalars"].loc[((i, "DE_bus_el"), "invest")]
+
+            iteration_results["storages_new_built"].at[
+                i, "existing_capacity_storage"
+            ] = storage["scalars"].loc[((i, "None"), "invest")]
 
         logging.info("Obtained initial (storage) levels for next iteration")
 
