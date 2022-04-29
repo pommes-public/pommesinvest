@@ -22,95 +22,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from pandas.tseries.frequencies import to_offset
 
-# Compress can be used to slice lists using another list of boolean values
-# -> used by method MultipleLeapYears
 from itertools import compress
-
-# Imports for creating holidays in pandas
-# See: https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html, accessed 03.09.2019
-# Pandas on git hub: https://github.com/pandas-dev/pandas/blob/master/pandas/tseries/holiday.py, accessed 03.09.2019
-from pandas.tseries.holiday import (
-    AbstractHolidayCalendar,
-    Holiday,
-    EasterMonday,
-    GoodFriday,
-)
-from pandas.tseries.offsets import Day, Easter
-
-### NOTE: SOME OF THE FUNCTIONS ARE NOT USED, BUT MAY AT SOME POINT BE USEFUL (OR NOT)
-
-# JK: FUNCTION NOT TESTED YET!
-def csv_to_excel(
-    path_from,
-    path_to="./inputs/",
-    filename_to="power_market_input_data",
-    *args
-):
-
-    """Reads in several csv-datasheets and puts them together to an Excel workbook.
-
-    Parameters
-    ----------
-    path_from: :obj:`str`
-        The path the csv files are stored at
-
-    path_to: :obj:`str`
-        The path where the resulting .xlsx file shall be  stored at
-
-    filename_to: :obj:`str`
-        The filename for the resulting .xlsx file
-
-    *args: :obj:`str`
-        A list of the name of csv-files that will be put together
-
-    Returns
-    -------
-    workbook: :obj:`file`
-        An Excel Workbook containing all data in separate Worksheets
-    """
-
-    # Create a list of sheets (i.e. pd.DataFrames)
-    sheets = [pd.read_csv(path_from + el, sep=";", decimal=",") for el in args]
-
-    # Create a Pandas Excel writer using XlsxWriter as the engine.
-    writer = pd.ExcelWriter(path_to + filename_to, engine="xlsxwriter")
-
-    for sheet in sheets:
-        sheet.to_excel(writer)
-
-    # Save the excel file and save it as variable workbook which is returned
-    writer.save()
-    workbook = writer.book
-
-    return workbook
-
-
-# 27.06.2019, FM: tested
-def datetime_index_from_demand_data(path, file):
-
-    """Separately read in demand data from a .csv file.
-    The first column of the demand file must be the index column containing entries
-    that can be interpreted as dates.
-
-    Parameters
-    ----------
-    path: :obj:`str`
-        The path the csv file is stored at with/ in the end in order to connect the path
-    file: :obj:`str`
-        The name of the demand data file
-
-    Returns
-    -------
-    datetime: :obj:`datetime index`
-    """
-
-    demand_df = pd.read_csv(
-        path + file, sep=";", decimal=",", parse_dates=True, index_col=0
-    )
-    # 27.06.2019, FM: old code: datetime= demand.df.index()
-    datetime = demand_df.index
-
-    return datetime
 
 
 def years_between(y1, y2):
@@ -136,41 +48,8 @@ def years_between(y1, y2):
     return abs(relativedelta(y1, y2).years)
 
 
-# 16.12.2018, JK: Function inspired from Stack overflow issue, see: https://stackoverflow.com/questions/24217641/how-to-get-the-difference-between-two-dates-in-hours-minutes-and-seconds, accessed 16.12.2018
-# 05.07.2019, FM: tested
-# TODO: YW: Search for pandas predefined function
-def hours_between(h1, h2):
-    """Calculate the difference in days between two days using the datetime package
-
-    Parameters:
-    ----------
-    h1: :obj:`str`
-        The first date string
-    h2: :obj:`str`
-        The second date string
-
-    Returns
-    -------
-    hour_diff: :obj:`int`
-        The difference between the two dates in hours
-
-
-    """
-
-    h1 = datetime.strptime(h1, "%Y-%m-%d %H:%M:%S")
-    h2 = datetime.strptime(h2, "%Y-%m-%d %H:%M:%S")
-    diff = abs((h2 - h1))
-    days, seconds = diff.days, diff.seconds
-    # 16.12.2018, JK: Double slash here is used for floor division (rounded down to nearest number)
-    # Actually not really needed here, since only full hours are simulated, at least so far...
-    hour_diff = days * 24 + math.floor(seconds / 3600)
-    print("hour_diff: " + str(hour_diff))
-
-    return hour_diff
-
-
 def time_steps_between_timestamps(ts1, ts2, freq):
-    """Calculate the difference between two time steps
+    """Calculate the difference between two time steps ignoring leap years
 
     Parameters
     ----------
@@ -187,19 +66,25 @@ def time_steps_between_timestamps(ts1, ts2, freq):
         The difference between the two dates in time steps
     """
     diff = ts2 - ts1
-    diff_in_hours = diff.days * 24 + math.floor(diff.seconds / 3600)
+    start_year = ts1.year
+    end_year = ts2.year
+    no_of_leap_years = len(
+        multiple_leap_years(list(range(start_year, end_year + 1)))
+    )
+
+    diff_in_hours = (
+        diff.days * 24
+        + math.floor(diff.seconds / 3600)
+        - no_of_leap_years * 24
+    )
 
     return math.floor(
         diff_in_hours / FREQUENCY_TO_TIMESTEPS[freq]["multiplicator"]
     )
 
 
-# 09.12.2018, JK: Routine to check whether a given year is a leapyear or not.
-# Could be useful for adapting the number of days resp. timesteps per year.
-# 05.07.2019, FM: tested
-def IsLeapYear(year):
-
-    """Check whether given year is a leap year or not.
+def is_leap_year(year):
+    """Check whether given year is a leap year or not
 
     Parameters:
     -----------
@@ -208,32 +93,23 @@ def IsLeapYear(year):
 
     Returns:
     --------
-    LeapYear: :obj:`boolean`
+    leap_year: :obj:`boolean`
         True if year is a leap year and False else
-
     """
-
-    # Underlying rules:
-    # every fourth year is a leap year unless it can be divided by 100.
-    # every fourhundredth year in turn is a leap year.
-
-    LeapYear = False
+    leap_year = False
 
     if year % 4 == 0:
-        LeapYear = True
+        leap_year = True
     if year % 100 == 0:
-        LeapYear = False
+        leap_year = False
     if year % 400 == 0:
-        LeapYear = True
+        leap_year = True
 
-    return LeapYear
+    return leap_year
 
 
-# 05.07.2019,FM: tested
-def MultipleLeapYears(years):
-
-    """Checks a list of multiple years to find out which one of them is a leap year.
-    In turn calls function IsLeapYear.
+def multiple_leap_years(years):
+    """Check a list of multiple years to find out which are leap years
 
     Parameters:
     -----------
@@ -242,26 +118,18 @@ def MultipleLeapYears(years):
 
     Returns:
     --------
-    LeapYears:
-        list of LeapYears
-
+    list of leap years
     """
-    LeapYearsBoolean = [IsLeapYear(el) for el in years]
-    # 11.12.2018, JK: To improve functionality, a set could be used to remove duplicates which may occur in input list
-    # Since this is more or less a throwaway function, there is no need to do that here.
-    # 11.12.2018, JK: compress is used here to be able to filter list years using LeapYearsBoolean, i.e. a list with boolean filter values
-    LeapYears = list(compress(years, LeapYearsBoolean))
-    return LeapYears
+    leap_years_boolean = [is_leap_year(el) for el in years]
+    return list(compress(years, leap_years_boolean))
 
 
-# TODO: Resume with resampled timeseries (JK)
-# -> There probably exist some routines from demand regio which may be used...
-# 05.07.2019, FM:Not yet tested
 def resample_timeseries(
     timeseries, freq, aggregation_rule="sum", interpolation_rule="linear"
 ):
 
-    """Resample a timeseries to the frequency provided.
+    """Resample a timeseries to the frequency provided
+
     The frequency of the given timeseries is determined at first and upsampling
     resp. downsampling are carried out afterwards. For upsampling linear
     interpolation (default) is used, but another method may be chosen.
@@ -283,20 +151,11 @@ def resample_timeseries(
         The resampled timeseries stored in a pd.DataFrame
 
     """
-
-    # 16.05.2019, JK: determine frequency of timeseries given
-    # For an alternative approach see: https://stackoverflow.com/questions/31517728/python-pandas-detecting-frequency-of-time-series
     try:
         original_freq = pd.infer_freq(timeseries.index, warn=True)
-
-    # Error occurs when only two neigbouring timesteps are simulated which
-    # might be a potential use case for the model
-    # Function needs at least 3 values to obtain freq of a timeseries
     except ValueError:
         original_freq = "AS"
 
-    # 16.05.2019, JK: Determine whether upsampling or downsampling is needed
-    # 16.05.2019, JK: Workaround needed here
     if to_offset(freq) > to_offset(original_freq):
         # do downsampling
         resampled_timeseries = timeseries.resample(freq).agg(aggregation_rule)
@@ -333,67 +192,6 @@ def combine_funcs(*funcs):
             f(*args, **kwargs)
 
     return combined_func
-
-
-def convert_annual_limit(annual_limit, starttime, endtime):
-    """Convert an annual limit to a sub- or multi-annual one
-
-    Parameters
-    ----------
-    annual_limit: :obj:`float` or :obj:`pd.Series`of :class:`float`
-        An annual limit (e.g. for emissions, investment budgets)
-        if starttime and endtime are within the same year
-        or a pd.Series of annual limits indexed by years if starttime and
-        endtime are not within one year
-
-    starttime: :obj:`str`
-        The first date string; starttime of the optimization run
-
-    endtime: :obj:`str`
-        The second date string; endtime of the optimization run
-
-    Returns
-    -------
-    new_limit: :obj:`float`
-        A sub-annual / multi-annual limit for the optimization timeframe
-
-    """
-    dt_start = datetime.strptime(starttime, "%Y-%m-%d %H:%M:%S")
-    dt_end = datetime.strptime(endtime, "%Y-%m-%d %H:%M:%S")
-    start_year = dt_start.year
-    end_year = dt_end.year
-
-    new_limit = 0
-
-    if start_year == end_year:
-        day_diff = days_between(starttime, endtime)
-        year_fraction = day_diff / float(365)
-        if isinstance(annual_limit, float):
-            new_limit = annual_limit * year_fraction
-        else:
-            new_limit = annual_limit[start_year] * year_fraction
-
-    else:
-        start_year_begin = str(start_year) + "-01-01 00:00:00"
-        end_year_end = str(end_year) + "-12-31 23:59:59"
-        day_diff_start = days_between(starttime, start_year_begin)
-        day_diff_end = days_between(end_year_end, endtime)
-
-        start_year_fraction = (365 - day_diff_start) / float(365)
-        end_year_fraction = (365 - day_diff_end) / float(365)
-        full_years = end_year - start_year - 1
-
-        # Add annual limits for full years within optimization time frame
-        for i in range(full_years):
-            new_limit += annual_limit[start_year + i + 1]
-
-        # Add limits for fractions of the start year and end year
-        new_limit += (
-            annual_limit[start_year] * start_year_fraction
-            + annual_limit[end_year] * end_year_fraction
-        )
-
-    return new_limit
 
 
 # Taken from oemof.tools.economics, but removed check for infeasible values
@@ -459,20 +257,3 @@ def calc_annuity(capex, n, wacc, u=None, cost_decrease=0):
 def discount_values(df, IR, RH_startyear, startyear):
     """discount values in a given DataFrame using IR as interest rate"""
     return df.div((1 + IR) ** (RH_startyear - startyear))
-
-
-class GermanHolidayCalendar(AbstractHolidayCalendar):
-    """Define rules for all national German holidays which are used
-    for data preparation."""
-
-    rules = [
-        Holiday("New Years", month=1, day=1),
-        GoodFriday,
-        EasterMonday,
-        Holiday("Ascension Day", month=1, day=1, offset=[Easter(), Day(39)]),
-        Holiday("Whitmonday", month=1, day=1, offset=[Easter(), Day(50)]),
-        Holiday("Labour Day", month=5, day=1),
-        Holiday("German Union Day", month=10, day=3),
-        Holiday("Christmas Day", month=12, day=25),
-        Holiday("Boxing Day", month=12, day=26),
-    ]
