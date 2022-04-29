@@ -2,7 +2,7 @@
 
 # 1) Set overall workflow control parameters
 control_parameters:
-    rolling_horizon: False
+    myopic_horizon: False
     aggregate_input: True
     interest_rate: 0.02
     solver: "gurobi"

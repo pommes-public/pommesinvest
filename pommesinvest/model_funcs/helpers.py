@@ -15,6 +15,8 @@ Python version >= 3.8
 import pandas as pd
 import math
 
+from pommesinvest.model_funcs.model_control import FREQUENCY_TO_TIMESTEPS
+
 # Import datetime for conversion between date string and its element (year, month, ...)
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -39,7 +41,10 @@ from pandas.tseries.offsets import Day, Easter
 
 # JK: FUNCTION NOT TESTED YET!
 def csv_to_excel(
-    path_from, path_to="./inputs/", filename_to="power_market_input_data", *args
+    path_from,
+    path_to="./inputs/",
+    filename_to="power_market_input_data",
+    *args
 ):
 
     """Reads in several csv-datasheets and puts them together to an Excel workbook.
@@ -108,7 +113,6 @@ def datetime_index_from_demand_data(path, file):
     return datetime
 
 
-# 28.09.2019, JK: Function taken from Stack overflow issue, see: https://stackoverflow.com/questions/4436957/pythonic-difference-between-two-dates-in-years, accessed 28.08.2019
 def years_between(y1, y2):
 
     """Calculate the difference in years between two dates using the dateutil.relativedelta package
@@ -129,37 +133,7 @@ def years_between(y1, y2):
 
     y1 = datetime.strptime(y1, "%Y-%m-%d %H:%M:%S")
     y2 = datetime.strptime(y2, "%Y-%m-%d %H:%M:%S")
-    year_diff = abs(relativedelta(y1, y2).years)
-
-    return year_diff
-
-
-# 09.12.2018, JK: Function taken from Stack overflow issue, see: https://stackoverflow.com/questions/8419564/difference-between-two-dates-in-python, accessed 09.12.2018
-# 27.06.2019, FM: tested
-def days_between(d1, d2):
-
-    """Calculate the difference in days between two days using the datetime package
-
-    Parameters:
-    ----------
-    d1: :obj:`str`
-        The first date string
-    d2: :obj:`str`
-        The second date string
-
-    Returns
-    -------
-    day_diff: :obj:`int`
-        The difference between the two dates in days
-
-
-    """
-
-    d1 = datetime.strptime(d1, "%Y-%m-%d %H:%M:%S")
-    d2 = datetime.strptime(d2, "%Y-%m-%d %H:%M:%S")
-    day_diff = abs((d2 - d1).days)
-
-    return day_diff
+    return abs(relativedelta(y1, y2).years)
 
 
 # 16.12.2018, JK: Function inspired from Stack overflow issue, see: https://stackoverflow.com/questions/24217641/how-to-get-the-difference-between-two-dates-in-hours-minutes-and-seconds, accessed 16.12.2018
@@ -196,7 +170,7 @@ def hours_between(h1, h2):
 
 
 def time_steps_between_timestamps(ts1, ts2, freq):
-    """Calculate the difference in hours between two timesteps
+    """Calculate the difference between two time steps
 
     Parameters
     ----------
@@ -205,19 +179,18 @@ def time_steps_between_timestamps(ts1, ts2, freq):
     ts2 : pd.Timestamp
         The second timestamp
     freq: str
-        The frequency information, e.g. '60min', '15min'
+        The frequency information, e.g. '60min', '4H'
 
     Returns
     -------
     hour_diff: int
-        The difference between the two dates in hours
+        The difference between the two dates in time steps
     """
-    time_steps_seconds = {"60min": (24, 3600), "15min": (96, 900)}
-
     diff = ts2 - ts1
+    diff_in_hours = diff.days * 24 + math.floor(diff.seconds / 3600)
 
-    return diff.days * time_steps_seconds[freq][0] + math.floor(
-        diff.seconds / time_steps_seconds[freq][1]
+    return math.floor(
+        diff_in_hours / FREQUENCY_TO_TIMESTEPS[freq]["multiplicator"]
     )
 
 
@@ -425,7 +398,7 @@ def convert_annual_limit(annual_limit, starttime, endtime):
 
 # Taken from oemof.tools.economics, but removed check for infeasible values
 def calc_annuity(capex, n, wacc, u=None, cost_decrease=0):
-    """Calculates the annuity of an initial investment 'capex', considering the
+    r"""Calculates the annuity of an initial investment 'capex', considering the
     cost of capital 'wacc' during a project horizon 'n'
 
     In case of a single initial investment, the employed formula reads:
@@ -438,12 +411,12 @@ def calc_annuity(capex, n, wacc, u=None, cost_decrease=0):
     'u', the formula yields:
 
     .. math::
-    annuity = capex \cdot \frac{(wacc \cdot (1+wacc)^n)}
-              {((1 + wacc)^n - 1)} \cdot \left(
-              \frac{1 - \left( \frac{(1-cost\_decrease)}
-              {(1+wacc)} \right)^n}
-              {1 - \left( \frac{(1-cost\_decrease)}{(1+wacc)}
-              \right)^u} \right)
+        annuity = capex \cdot \frac{(wacc \cdot (1+wacc)^n)}
+                {((1 + wacc)^n - 1)} \cdot \left(
+                \frac{1 - \left( \frac{(1-cost\_decrease)}
+                {(1+wacc)} \right)^n}
+                {1 - \left( \frac{(1-cost\_decrease)}{(1+wacc)}
+                \right)^u} \right)
 
     Parameters
     ----------

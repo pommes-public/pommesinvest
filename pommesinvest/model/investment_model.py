@@ -51,32 +51,7 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 
 
 import calendar
-from functions_for_processing_of_outputs_invest import (
-    extract_model_results,
-    create_aggregated_energy_source_results,
-    create_aggregated_investment_results,
-    create_aggregated_investment_results_RH,
-    create_results_to_save,
-    draw_production_plot,
-    draw_investment_decisions_plot,
-    draw_investment_decisions_plot_RH,
-    draw_exo_investment_decisions_plot,
-    draw_decommissioning_plot,
-)
-from helper_functions_invest import years_between
-from functions_for_model_control_invest import (
-    determine_timeslices_RH,
-    add_further_constrs,
-    build_simple_model,
-    build_RH_model,
-    initial_states_RH,
-    solve_RH_model,
-    dump_es,
-    reconstruct_objective_value,
-)
 from oemof.tools import logger
-import oemof.solph as solph
-from matplotlib import pyplot as plt
 import argparse
 import logging
 import time
@@ -117,9 +92,9 @@ def run_investment_model(config_file="./config.yml"):
         nolog=True,
     )
 
-    if im.rolling_horizon:
-        im.add_rolling_horizon_configuration(
-            config["rolling_horizon_parameters"], nolog=True
+    if im.myopic_horizon:
+        im.add_myopic_horizon_configuration(
+            config["myopic_horizon_parameters"], nolog=True
         )
 
     im.initialize_logging()
@@ -139,7 +114,7 @@ def run_investment_model(config_file="./config.yml"):
     dispatch_results = pd.DataFrame()
 
     # Model run for integral optimization horizon (simple model set up)
-    if not im.rolling_horizon:
+    if not im.myopic_horizon:
         im.build_simple_model()
 
         if im.write_lp_file:
@@ -154,14 +129,14 @@ def run_investment_model(config_file="./config.yml"):
         model_meta["overall_objective"] = meta_results["objective"]
         model_meta["overall_solution_time"] += meta_results["solver"]["Time"]
 
-    # Model run for rolling horizon optimization
-    if im.rolling_horizon:
+    # Model run for myopic horizon optimization
+    if im.myopic_horizon:
         logging.info(
             "Creating a LP optimization model for investment optimization\n"
-            "using a ROLLING HORIZON approach for model solution."
+            "using a MYOPIC HORIZON approach for model solution."
         )
 
-        # Initialization of rolling horizon model run
+        # Initialization of myopic horizon model run
         iteration_results = {
             "storages_initial": pd.DataFrame(),
             "transformers_initial": pd.DataFrame(),
@@ -172,13 +147,15 @@ def run_investment_model(config_file="./config.yml"):
 
         for counter in range(getattr(im, "amount_of_time_slices")):
             # rebuild the EnergySystem in each iteration
-            im.build_rolling_horizon_model(counter, iteration_results)
+            im.build_myopic_horizon_model(counter, iteration_results)
 
-            # Solve rolling horizon model
-            im.solve_rolling_horizon_model(counter, iteration_results, model_meta)
+            # Solve myopic horizon model
+            im.solve_myopic_horizon_model(
+                counter, iteration_results, model_meta
+            )
 
             # Get initial states for the next model run from results
-            im.retrieve_initial_states_rolling_horizon(iteration_results)
+            im.retrieve_initial_states_myopic_horizon(iteration_results)
 
         dispatch_results = iteration_results["dispatch_results"]
         investment_results = iteration_results["investment_results"]
@@ -189,22 +166,28 @@ def run_investment_model(config_file="./config.yml"):
 
     model_control.show_meta_logging_info(model_meta)
 
-    if not im.rolling_horizon:
+    if not im.myopic_horizon:
         model_results = processing.results(im.om)
 
         dispatch_results = views.node(model_results, "DE_bus_el")["sequences"]
-        investment_results = views.node(model_results, "DE_bus_el")["period_scalars"]
+        investment_results = views.node(model_results, "DE_bus_el")[
+            "period_scalars"
+        ]
 
     if im.save_investment_results:
         investment_results.to_csv(
-            im.path_folder_output + getattr(im, "filename") + "_investment.csv",
+            im.path_folder_output
+            + getattr(im, "filename")
+            + "_investment.csv",
             sep=",",
             decimal=".",
         )
 
     if im.save_production_results:
         dispatch_results.to_csv(
-            im.path_folder_output + getattr(im, "filename") + "_production.csv",
+            im.path_folder_output
+            + getattr(im, "filename")
+            + "_production.csv",
             sep=",",
             decimal=".",
         )
@@ -374,7 +357,10 @@ if not RollingHorizon:
 else:
     RH = "myopic_"
     horizon_overlap = (
-        str(myopic_horizon_in_years) + "years_" + str(overlap_in_timesteps) + "overlap_"
+        str(myopic_horizon_in_years)
+        + "years_"
+        + str(overlap_in_timesteps)
+        + "overlap_"
     )
 if AggregateInput:
     Agg = "clustered_"
@@ -511,7 +497,9 @@ filename_node_timeseries = (
 # filename_node_timeseries = 'node_timeseries_2019-10-13.csv'
 
 # Input data containing costs data
-filename_cost_data = "2power_market_input_data_complete_cost" + file_version + ".xlsx"
+filename_cost_data = (
+    "2power_market_input_data_complete_cost" + file_version + ".xlsx"
+)
 # filename_cost_data = 'cost_input_data_invest_2019-10-13.xlsx'
 filename_cost_timeseries = "3cost_timeseries" + file_version + "_JK.csv"
 # filename_cost_timeseries = 'cost_timeseries_2019-10-13.csv'
@@ -524,7 +512,9 @@ if ActivateInvestmentBudgetLimit:
     investment_budget_per_year = 1000000
 
     if RollingHorizon:
-        investment_budget = investment_budget_per_year * myopic_horizon_in_years
+        investment_budget = (
+            investment_budget_per_year * myopic_horizon_in_years
+        )
     else:
         investment_budget = investment_budget_per_year * optimization_timeframe
 
@@ -716,7 +706,9 @@ if RollingHorizon:
             counter,
             startyear,
             myopic_horizon_in_years,
-            timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[counter][1],
+            timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[
+                counter
+            ][1],
             results_sequences=results_sequences,
             results_scalars=results_scalars,
             overall_objective=overall_objective,
@@ -730,7 +722,9 @@ if RollingHorizon:
         # See function definition for details
         transformers_init_df, storages_init_df = initial_states_RH(
             om,
-            timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[counter][1],
+            timeslice_length_wo_overlap_in_timesteps=timeslice_length_dict[
+                counter
+            ][1],
             new_built_transformer_labels=new_built_transformer_labels,
             new_built_storage_labels=new_built_storage_labels,
             endo_exo_exist_df=endo_exo_exist_df,
@@ -797,7 +791,9 @@ if PlotProductionResults:
 
     if SaveProductionPlot:
         path = "./results/"
-        plt.savefig(path + filename + "_production.png", dpi=150, bbox_inches="tight")
+        plt.savefig(
+            path + filename + "_production.png", dpi=150, bbox_inches="tight"
+        )
 
     plt.show()
 
@@ -887,7 +883,9 @@ if PlotInvestmentDecisionsResults:
 
     if SaveInvestmentDecisionsPlot:
         path = "./results/"
-        plt.savefig(path + filename + "_investments.png", dpi=150, bbox_inches="tight")
+        plt.savefig(
+            path + filename + "_investments.png", dpi=150, bbox_inches="tight"
+        )
 
 if SaveInvestmentDecisionsResults:
     path = "./results/"

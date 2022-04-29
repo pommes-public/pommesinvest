@@ -25,7 +25,7 @@ from oemof.tools import logger
 from pommesinvest.model_funcs import helpers
 from pommesinvest.model_funcs.data_input import (
     nodes_from_csv,
-    nodes_from_csv_rolling_horizon,
+    nodes_from_csv_myopic_horizon,
 )
 import warnings
 
@@ -49,8 +49,12 @@ FREQUENCY_TO_TIMESTEPS = {
 def show_meta_logging_info(model_meta):
     """Show some logging information on model meta data"""
     logging.info("***** MODEL RUN TERMINATED SUCCESSFULLY :-) *****")
-    logging.info(f"Overall objective value: {model_meta['overall_objective']:,.0f}")
-    logging.info(f"Overall solution time: {model_meta['overall_solution_time']:.2f}")
+    logging.info(
+        f"Overall objective value: {model_meta['overall_objective']:,.0f}"
+    )
+    logging.info(
+        f"Overall solution time: {model_meta['overall_solution_time']:.2f}"
+    )
     logging.info(f"Overall time: {model_meta['overall_time']:.2f}")
 
 
@@ -62,10 +66,10 @@ class InvestmentModel(object):
 
     Attributes
     ----------
-    rolling_horizon : boolean
-        boolean control variable indicating whether to run a rolling horizon
+    myopic_horizon : boolean
+        boolean control variable indicating whether to run a myopic horizon
         optimization or an integral optimization run (a simple model).
-        Note: For the rolling_horizon optimization run, additionally the
+        Note: For the myopic_horizon optimization run, additionally the
         parameters `time_slice_length_wo_overlap_in_hours` and
         `overlap_in_hours` (both of type int) have to be defined.
 
@@ -222,17 +226,17 @@ class InvestmentModel(object):
     om : :class:`oemof.solph.models.Model`
         The mathematical optimization model itself
 
-    time_slice_length_wo_overlap_in_hours : int (optional, for rolling horizon)
-        The length of a time slice for a rolling horizon model run in hours,
+    time_slice_length_wo_overlap_in_hours : int (optional, for myopic horizon)
+        The length of a time slice for a myopic horizon model run in hours,
         not including an overlap
 
-    overlap_in_hours : int (optional, for rolling horizon)
-        The length of the overlap for a rolling horizon model run in hours
+    overlap_in_hours : int (optional, for myopic horizon)
+        The length of the overlap for a myopic horizon model run in hours
     """  # noqa: E501
 
     def __init__(self):
         """Initialize an empty InvestmentModel object"""
-        self.rolling_horizon = None
+        self.myopic_horizon = None
         self.aggregate_input = None
         self.interest_rate = None
         self.solver = None
@@ -282,7 +286,9 @@ class InvestmentModel(object):
                     self.set_multiplicator()
 
         if hasattr(self, "start_time"):
-            setattr(self, "start_year", str(pd.to_datetime(self.start_time).year))
+            setattr(
+                self, "start_year", str(pd.to_datetime(self.start_time).year)
+            )
         if hasattr(self, "end_time"):
             setattr(self, "end_year", str(pd.to_datetime(self.end_time).year))
 
@@ -306,18 +312,24 @@ class InvestmentModel(object):
                     + "has not yet been specified!"
                 )
             if entry == "fuel_cost_pathway":
-                logging.info(f"Using fuel cost pathway: {getattr(self, entry)}")
+                logging.info(
+                    f"Using fuel cost pathway: {getattr(self, entry)}"
+                )
             elif entry == "emissions_cost_pathway":
-                logging.info(f"Using emissions cost pathway: {getattr(self, entry)}")
+                logging.info(
+                    f"Using emissions cost pathway: {getattr(self, entry)}"
+                )
             elif entry == "investment_cost_pathway":
-                logging.info(f"Using investment cost pathway: {getattr(self, entry)}")
+                logging.info(
+                    f"Using investment cost pathway: {getattr(self, entry)}"
+                )
 
         return missing_parameters
 
-    def add_rolling_horizon_configuration(
-        self, rolling_horizon_parameters, nolog=False
+    def add_myopic_horizon_configuration(
+        self, myopic_horizon_parameters, nolog=False
     ):
-        r"""Add a rolling horizon configuration to the dispatch model
+        r"""Add a myopic horizon configuration to the dispatch model
 
         .. _note:
 
@@ -326,10 +338,14 @@ class InvestmentModel(object):
             allow for adding another time slice, the last couple of time
             steps of the time series are not used.
         """
-        self.update_model_configuration(rolling_horizon_parameters, nolog=nolog)
+        self.update_model_configuration(myopic_horizon_parameters, nolog=nolog)
 
-        setattr(self, "time_series_start", pd.Timestamp(self.start_time, self.freq))
-        setattr(self, "time_series_end", pd.Timestamp(self.end_time, self.freq))
+        setattr(
+            self, "time_series_start", pd.Timestamp(self.start_time, self.freq)
+        )
+        setattr(
+            self, "time_series_end", pd.Timestamp(self.end_time, self.freq)
+        )
 
         setattr(
             self,
@@ -375,9 +391,11 @@ class InvestmentModel(object):
 
     def initialize_logging(self):
         """Initialize logging by deriving a filename from the configuration"""
-        optimization_timeframe = helpers.days_between(self.start_time, self.end_time)
+        optimization_timeframe = helpers.years_between(
+            self.start_time, self.end_time
+        )
 
-        if not self.rolling_horizon:
+        if not self.myopic_horizon:
             rh = "simple_"
         else:
             rh = "RH_"
@@ -391,7 +409,7 @@ class InvestmentModel(object):
             + self.start_time[:10]
             + "_"
             + str(optimization_timeframe)
-            + "-days_"
+            + "-years_"
             + rh
             + agg
         )
@@ -430,14 +448,20 @@ class InvestmentModel(object):
         not including any measures for complexity reduction.
         """
         logging.info("Starting optimization")
-        logging.info("Running an integrated INVESTMENT AND DISPATCH OPTIMIZATION")
+        logging.info(
+            "Running an integrated INVESTMENT AND DISPATCH OPTIMIZATION"
+        )
 
-        datetime_index = pd.date_range(self.start_time, self.end_time, freq=self.freq)
+        datetime_index = pd.date_range(
+            self.start_time, self.end_time, freq=self.freq
+        )
         es = network.EnergySystem(timeindex=datetime_index)
 
         nodes_dict, emissions_limit = nodes_from_csv(self)
 
-        logging.info("Creating a LP model for INVESTMENT AND DISPATCH OPTIMIZATION.")
+        logging.info(
+            "Creating a LP model for INVESTMENT AND DISPATCH OPTIMIZATION."
+        )
 
         es.add(*nodes_dict.values())
         setattr(self, "om", models.Model(es))
@@ -497,10 +521,12 @@ class InvestmentModel(object):
             constraints.emission_limit(
                 self.om, flows=emission_flows, limit=emissions_limit
             )
-            logging.info(f"Adding an EMISSIONS LIMIT of {emissions_limit} t CO2")
+            logging.info(
+                f"Adding an EMISSIONS LIMIT of {emissions_limit} t CO2"
+            )
 
-    def build_rolling_horizon_model(self, counter, iteration_results):
-        r"""Set up and return a rolling horizon LP dispatch model
+    def build_myopic_horizon_model(self, counter, iteration_results):
+        r"""Set up and return a myopic horizon LP dispatch model
 
         Track the storage labels in order to obtain and pass initial
         storage levels for each iteration. Set the end time of an iteration
@@ -509,18 +535,20 @@ class InvestmentModel(object):
         Parameters
         ----------
         counter : int
-            A counter for the rolling horizon optimization iterations
+            A counter for the myopic horizon optimization iterations
 
         iteration_results : dict
-            A dictionary holding the results of the previous rolling horizon
+            A dictionary holding the results of the previous myopic horizon
             iteration
         """
         logging.info(f"Starting optimization for optimization run {counter}")
         logging.info(
-            f"Start of iteration {counter}: " + f"{getattr(self, 'time_series_start')}"
+            f"Start of iteration {counter}: "
+            + f"{getattr(self, 'time_series_start')}"
         )
         logging.info(
-            f"End of iteration {counter}: " + f"{getattr(self, 'time_series_end')}"
+            f"End of iteration {counter}: "
+            + f"{getattr(self, 'time_series_end')}"
         )
 
         datetime_index = pd.date_range(
@@ -534,35 +562,39 @@ class InvestmentModel(object):
             node_dict,
             emissions_limit,
             storage_and_transformer_labels,
-        ) = nodes_from_csv_rolling_horizon(self, iteration_results)
+        ) = nodes_from_csv_myopic_horizon(self, iteration_results)
         # Only set storage and transformer labels attribute for the 0th iteration
         if not hasattr(self, "storage_and_transformer_labels"):
             setattr(
-                self, "storage_and_transformer_labels", storage_and_transformer_labels
+                self,
+                "storage_and_transformer_labels",
+                storage_and_transformer_labels,
             )
 
         # Update model start time for the next iteration
         setattr(self, "time_series_start", getattr(self, "time_series_end"))
 
         es.add(*node_dict.values())
-        logging.info(f"Successfully set up energy system for iteration {counter}")
+        logging.info(
+            f"Successfully set up energy system for iteration {counter}"
+        )
 
         self.om = models.Model(es)
 
         self.add_further_constrs(emissions_limit)
 
-    def solve_rolling_horizon_model(
+    def solve_myopic_horizon_model(
         self, counter, iter_results, model_meta, no_solver_log=False
     ):
-        """Solve a rolling horizon optimization model
+        """Solve a myopic horizon optimization model
 
         Parameters
         ----------
         counter : int
-            A counter for the rolling horizon optimization iterations
+            A counter for the myopic horizon optimization iterations
 
         iter_results : dict
-            A dictionary holding the results of the previous rolling horizon
+            A dictionary holding the results of the previous myopic horizon
             iteration
 
         model_meta : dict
@@ -593,15 +625,17 @@ class InvestmentModel(object):
         logging.info(f"Model run {counter} done!")
 
         iter_results["model_results"] = processing.results(self.om)
-        electricity_bus = views.node(iter_results["model_results"], "DE_bus_el")
+        electricity_bus = views.node(
+            iter_results["model_results"], "DE_bus_el"
+        )
         sliced_dispatch_results = pd.DataFrame(
             data=electricity_bus["sequences"].iloc[
                 0 : getattr(self, "time_slice_length_wo_overlap_in_time_steps")
             ]
         )
-        iter_results["dispatch_results"] = iter_results["dispatch_results"].append(
-            sliced_dispatch_results
-        )
+        iter_results["dispatch_results"] = iter_results[
+            "dispatch_results"
+        ].append(sliced_dispatch_results)
         iter_results["investment_results"] = electricity_bus["scalars"]
 
         meta_results = processing.meta_results(self.om)
@@ -615,13 +649,13 @@ class InvestmentModel(object):
         )
         model_meta["overall_solution_time"] += meta_results["solver"]["Time"]
 
-    def retrieve_initial_states_rolling_horizon(self, iteration_results):
-        r"""Retrieve the initial states for the upcoming rolling horizon run
+    def retrieve_initial_states_myopic_horizon(self, iteration_results):
+        r"""Retrieve the initial states for the upcoming myopic horizon run
 
         Parameters
         ----------
         iteration_results : dict
-            A dictionary holding the results of the previous rolling horizon
+            A dictionary holding the results of the previous myopic horizon
             iteration
         """
         iteration_results["storages_existing"] = pd.DataFrame(
@@ -670,123 +704,6 @@ class InvestmentModel(object):
             ] = storage["scalars"].loc[((i, "None"), "invest")]
 
         logging.info("Obtained initial (storage) levels for next iteration")
-
-
-def determine_timeslices_RH(
-    starttime,
-    endtime,
-    freq,
-    freq_timesteps,
-    myopic_horizon_in_years,
-    overlap_in_timesteps,
-):
-    """Functions determines timeslice lengths for a RH model run.
-    It takes start and end time as well as myopic optimization length as inputs
-    and returns a dict of timeslice lengths taking into acount leap years.
-
-    Parameters
-    ----------
-    starttime : :obj:`str`
-        The starttime of the optimization run
-
-    endtime : :obj:`str`
-        The endtime of the optimization run
-
-    freq : :obj:`str`
-        The frequency used for the datetimeindex of the optimization run
-
-    freq_timesteps : obj:`dict` of :class:`tuple`
-        A dictionary mapping amount of annual timeslices and a multiplicator
-        for modifying (hourly) input data to the given frequency (freq)
-
-    myopic_horizon_in_years : :obj:`int`
-        The length of intervalls used for myopic optimization in years
-
-    overlap_in_timesteps : :obj:`int`
-        An overlap may in principle be set, but is set to 0 in the first place
-
-    Returns
-    -------
-    timeseries_start : :obj:`pd.Timestamp`
-        starttime given as a pd.Timestamp object
-
-    amount_of_timeslices : :obj:`int`
-        The amount of myopic optimization iterations
-
-    timeslice_length_dict : :obj:`dict` of :class:`tuple`
-        A dictionary with the iteration (i.e. timeslice) number as key and
-        the amount of timesteps for that iteration as value; the value in turn
-        is a tuple consisting of number of years, number of timesteps wo overlap
-        and number of timesteps with overlap
-
-    """
-
-    timeseries_start = pd.Timestamp(starttime, freq)
-    timeseries_end = pd.Timestamp(endtime, freq)
-
-    # Consideration of leap years -> adjust amount of timeslices if year is a leap year.
-    startyear = timeseries_start.year
-    endyear = timeseries_end.year
-
-    years = range(startyear, endyear + 1)
-    leap_years = MultipleLeapYears(years)
-
-    # Determine amount of timeslices per year for every year considered
-    timeslice_year_dict = {}
-
-    for year in years:
-        if not year in leap_years:
-            timeslice_year_dict[year] = freq_timesteps[0]
-        else:
-            timeslice_year_dict[year] = freq_timesteps[1]
-
-    # Calculate amount of timeslices needed
-    # (Consideration of complete years only)
-    overall_years = endyear - startyear + 1
-    amount_of_timeslices = math.ceil(overall_years / myopic_horizon_in_years)
-
-    # Amount of timeslices within one iteration may vary due to leap years.
-    # Therefore, it is stored as a dict with the iteration number as key
-    timeslice_length_dict = {}
-    start = startyear
-
-    for i in range(amount_of_timeslices):
-
-        # Initialize timeslice length without overlap
-        timeslice_length_dict[i] = 0
-
-        # If we are not in the last iteration
-        if i != amount_of_timeslices - 1:
-            for year in range(start, start + myopic_horizon_in_years):
-                if not year == start + myopic_horizon_in_years - 1:
-                    timeslice_length_dict[i] += timeslice_year_dict[year]
-                else:
-                    timeslice_length_dict[i] = (
-                        myopic_horizon_in_years,
-                        timeslice_length_dict[i] + timeslice_year_dict[year],
-                        timeslice_length_dict[i]
-                        + timeslice_year_dict[year]
-                        + overlap_in_timesteps,
-                    )
-
-        # Last iteration
-        else:
-
-            for year in range(start, endyear + 1):
-                if not year == endyear:
-                    timeslice_length_dict[i] += timeslice_year_dict[year]
-                else:
-                    timeslice_length_dict[i] = (
-                        len(range(start, endyear + 1)),
-                        timeslice_length_dict[i] + timeslice_year_dict[year],
-                        timeslice_length_dict[i]
-                        + timeslice_year_dict[year]
-                        + overlap_in_timesteps,
-                    )
-
-        start += myopic_horizon_in_years
-
-    return timeseries_start, amount_of_timeslices, timeslice_length_dict
 
 
 def add_further_constrs(
@@ -869,7 +786,9 @@ def add_further_constrs(
     if ActivateInvestmentBudgetLimit:
         om = solph.constraints.investment_limit(om, limit=investment_budget)
 
-        logging.info(f"Adding an INVESTMENT BUDGET LIMIT of {investment_budget} €")
+        logging.info(
+            f"Adding an INVESTMENT BUDGET LIMIT of {investment_budget} €"
+        )
 
     return om
 
@@ -1096,7 +1015,7 @@ def initial_states_RH(
     endo_exo_exist_df,
     endo_exo_exist_stor_df,
 ):
-    """Obtain the initial states / existing capacities for the upcoming rolling horizon (resp.
+    """Obtain the initial states / existing capacities for the upcoming myopic horizon (resp.
     myopic optimization window) model run for a LP INVESTMENT MODEL configuration by iterating
     over all nodes of the energy system using lists of storage resp. transformer input data obtained
     from the input data file. Existing capacities have to be determined for both, transformers and
@@ -1110,7 +1029,7 @@ def initial_states_RH(
         The mathematical optimisation model solved including the results
 
     timeslice_length_wo_overlap_in_timesteps: :obj:`int`
-        length of a rolling horizon timeslice excluding overlap
+        length of a myopic horizon timeslice excluding overlap
 
     new_built_transformer_labels: :obj:`list` of ::class:`str`
         list of transformer labels (obtained from input data)
@@ -1166,9 +1085,9 @@ def initial_states_RH(
         transformer = solph.views.node(model_results, i)
         # TODO, JK: Find a more elegant solution than doing this here... -> obtain country info before
         try:
-            transformers_init_df.loc[i, "Existing_Capacity_Transformer"] = transformer[
-                "scalars"
-            ][((i, "DE_bus_el"), "invest")]
+            transformers_init_df.loc[
+                i, "Existing_Capacity_Transformer"
+            ] = transformer["scalars"][((i, "DE_bus_el"), "invest")]
             transformers_init_df.loc[
                 i, "Existing_Capacity_endo"
             ] = endo_exo_exist_df.loc[i, "Existing_Capacity_endo"]
@@ -1176,12 +1095,14 @@ def initial_states_RH(
                 transformers_init_df.loc[i, "Existing_Capacity_Transformer"]
                 + transformers_init_df.loc[i, "Existing_Capacity_endo"]
             )
-            transformers_init_df.loc[i, "old_exo"] = endo_exo_exist_df.loc[i, "old_exo"]
+            transformers_init_df.loc[i, "old_exo"] = endo_exo_exist_df.loc[
+                i, "old_exo"
+            ]
 
         except:
-            transformers_init_df.loc[i, "Existing_Capacity_Transformer"] = transformer[
-                "scalars"
-            ][((i, "AT_bus_el"), "invest")]
+            transformers_init_df.loc[
+                i, "Existing_Capacity_Transformer"
+            ] = transformer["scalars"][((i, "AT_bus_el"), "invest")]
 
     # Iterate over all storages and set parameters for initial timestep of next timeslice
     for i, s in storages_init_df.iterrows():
@@ -1191,18 +1112,20 @@ def initial_states_RH(
         try:
 
             #  Obtain data for last timestep of storage unit during the optimization run (excluding overlap)
-            storages_init_df.loc[i, "Capacity_Last_Timestep"] = storage["sequences"][
-                ((i, "None"), "storage_content")
-            ][timeslice_length_wo_overlap_in_timesteps - 1]
-            storages_init_df.loc[i, "Existing_Inflow_Power"] = storage["scalars"][
-                (("DE_bus_el", i), "invest")
+            storages_init_df.loc[i, "Capacity_Last_Timestep"] = storage[
+                "sequences"
+            ][((i, "None"), "storage_content")][
+                timeslice_length_wo_overlap_in_timesteps - 1
             ]
-            storages_init_df.loc[i, "Existing_Outflow_Power"] = storage["scalars"][
-                ((i, "DE_bus_el"), "invest")
-            ]
-            storages_init_df.loc[i, "Existing_Capacity_Storage"] = storage["scalars"][
-                ((i, "None"), "invest")
-            ]
+            storages_init_df.loc[i, "Existing_Inflow_Power"] = storage[
+                "scalars"
+            ][(("DE_bus_el", i), "invest")]
+            storages_init_df.loc[i, "Existing_Outflow_Power"] = storage[
+                "scalars"
+            ][((i, "DE_bus_el"), "invest")]
+            storages_init_df.loc[i, "Existing_Capacity_Storage"] = storage[
+                "scalars"
+            ][((i, "None"), "invest")]
 
             storages_init_df.loc[
                 i, "Existing_Capacity_endo"
@@ -1210,9 +1133,9 @@ def initial_states_RH(
             storages_init_df.loc[
                 i, "Existing_turbine_endo"
             ] = endo_exo_exist_stor_df.loc[i, "turbine_endo"]
-            storages_init_df.loc[i, "Existing_pump_endo"] = endo_exo_exist_stor_df.loc[
-                i, "pump_endo"
-            ]
+            storages_init_df.loc[
+                i, "Existing_pump_endo"
+            ] = endo_exo_exist_stor_df.loc[i, "pump_endo"]
 
             storages_init_df.loc[i, "capacity_endo_cumulated"] = (
                 storages_init_df.loc[i, "Existing_Capacity_Storage"]
@@ -1227,30 +1150,32 @@ def initial_states_RH(
                 + storages_init_df.loc[i, "Existing_Capacity_endo"]
             )
 
-            storages_init_df.loc[i, "old_exo_cap"] = endo_exo_exist_stor_df.loc[
+            storages_init_df.loc[
                 i, "old_exo_cap"
-            ]
-            storages_init_df.loc[i, "old_exo_turbine"] = endo_exo_exist_stor_df.loc[
+            ] = endo_exo_exist_stor_df.loc[i, "old_exo_cap"]
+            storages_init_df.loc[
                 i, "old_exo_turbine"
-            ]
-            storages_init_df.loc[i, "old_exo_pump"] = endo_exo_exist_stor_df.loc[
+            ] = endo_exo_exist_stor_df.loc[i, "old_exo_turbine"]
+            storages_init_df.loc[
                 i, "old_exo_pump"
-            ]
+            ] = endo_exo_exist_stor_df.loc[i, "old_exo_pump"]
 
         except:
 
-            storages_init_df.loc[i, "Capacity_Last_Timestep"] = storage["sequences"][
-                ((i, "None"), "storage_content")
-            ][timeslice_length_wo_overlap_in_timesteps - 1]
-            storages_init_df.loc[i, "Existing_Inflow_Power"] = storage["scalars"][
-                (("AT_bus_el", i), "invest")
+            storages_init_df.loc[i, "Capacity_Last_Timestep"] = storage[
+                "sequences"
+            ][((i, "None"), "storage_content")][
+                timeslice_length_wo_overlap_in_timesteps - 1
             ]
-            storages_init_df.loc[i, "Existing_Outflow_Power"] = storage["scalars"][
-                ((i, "AT_bus_el"), "invest")
-            ]
-            storages_init_df.loc[i, "Existing_Capacity_Storage"] = storage["scalars"][
-                ((i, "None"), "invest")
-            ]
+            storages_init_df.loc[i, "Existing_Inflow_Power"] = storage[
+                "scalars"
+            ][(("AT_bus_el", i), "invest")]
+            storages_init_df.loc[i, "Existing_Outflow_Power"] = storage[
+                "scalars"
+            ][((i, "AT_bus_el"), "invest")]
+            storages_init_df.loc[i, "Existing_Capacity_Storage"] = storage[
+                "scalars"
+            ][((i, "None"), "invest")]
 
     return transformers_init_df, storages_init_df
 
@@ -1290,7 +1215,7 @@ def build_RH_model(
     approach="DIW",
     scenario="50",
 ):
-    """Set up and return a rolling horizon LP dispatch model
+    """Set up and return a myopic horizon LP dispatch model
 
     Parameters
     ----------
@@ -1357,7 +1282,7 @@ def build_RH_model(
         to another (usually a lower) one
 
     overlap_in_timesteps : :obj:`int`
-        the overlap in timesteps if a rolling horizon model is run
+        the overlap in timesteps if a myopic horizon model is run
         (to prevent index out of bounds error)
 
     years_per_timeslice : :obj:`int`
@@ -1412,7 +1337,7 @@ def build_RH_model(
 
     es : :class:`oemof.solph.network.EnergySystem`
         The energy system itself (used for determining initial states for the
-        next rolling horizon iteration)
+        next myopic horizon iteration)
 
     timeseries_start : :obj:`pd.Timestamp`
         the adjusted starting timestep for used the next iteration
@@ -1450,7 +1375,9 @@ def build_RH_model(
     """
     # Set date_range object from start to endtime of each iteration
     datetime_index = pd.date_range(
-        start=timeseries_start, periods=timeslice_length_with_overlap, freq=freq
+        start=timeseries_start,
+        periods=timeslice_length_with_overlap,
+        freq=freq,
     )
 
     startyear = timeseries_start.year
@@ -1517,7 +1444,9 @@ def build_RH_model(
     )
 
     es.add(*node_dict.values())
-    logging.info("Sucessfully set up energy system for iteration " + str(counter))
+    logging.info(
+        "Sucessfully set up energy system for iteration " + str(counter)
+    )
 
     om = solph.Model(es)
 
@@ -1562,7 +1491,7 @@ def solve_RH_model(
     discount=False,
     solver="gurobi",
 ):
-    """Function for solving the rolling horizon optimization for a given window.
+    """Function for solving the myopic horizon optimization for a given window.
     Returns the results as well as updated information on the overall_solution
     and overall solution_time.
 
@@ -1578,10 +1507,10 @@ def solve_RH_model(
         The start year of the optimization window (iteration)
 
     counter : :obj:`int`
-        A counter for rolling horizon optimization windows (iterations)
+        A counter for myopic horizon optimization windows (iterations)
 
     timeslice_length_wo_overlap_in_timesteps : :obj:`int`
-        Determines the length of a single (rolling horizon) optimization window
+        Determines the length of a single (myopic horizon) optimization window
         (excluding overlap)
 
     results_sequences : :obj:`pd.DataFrame`
@@ -1642,7 +1571,9 @@ def solve_RH_model(
     electricity_bus_scalars = electricity_bus["scalars"]
     # Save results (excluding overlap)
     df_rcut = pd.DataFrame(
-        data=electricity_bus["sequences"][0:timeslice_length_wo_overlap_in_timesteps]
+        data=electricity_bus["sequences"][
+            0:timeslice_length_wo_overlap_in_timesteps
+        ]
     )
 
     # Create storage_labels to iterate over them to get the capacity scalars and sequences
@@ -1656,13 +1587,17 @@ def solve_RH_model(
                 0:timeslice_length_wo_overlap_in_timesteps
             ][[((i, "None"), "storage_content")]]
         )
-        df_rcut = pd.concat([df_rcut, storage_capacity_results], axis=1, sort=True)
+        df_rcut = pd.concat(
+            [df_rcut, storage_capacity_results], axis=1, sort=True
+        )
         if i in new_built_storage_labels:
             capacity_invest_results = storage_results_dict[i]["scalars"][
                 [((i, "None"), "invest")]
             ]
             electricity_bus_scalars = pd.concat(
-                [electricity_bus_scalars, capacity_invest_results], axis=0, sort=True
+                [electricity_bus_scalars, capacity_invest_results],
+                axis=0,
+                sort=True,
             )
 
     results_scalars = pd.concat(
@@ -1682,7 +1617,8 @@ def solve_RH_model(
         overall_objective += int(meta_results["objective"])
     else:
         overall_objective += int(
-            (meta_results["objective"]) / ((1 + IR) ** (RH_startyear - startyear))
+            (meta_results["objective"])
+            / ((1 + IR) ** (RH_startyear - startyear))
         )
 
     overall_solution_time += meta_results["solver"]["Time"]
@@ -1728,7 +1664,8 @@ def reconstruct_objective_value(om):
 
         if om.flows[i, o].investment.ep_costs is not None:
             investment_costs += (
-                om.flows[i, o].invest[i, o] * om.flows[i, o].investment.ep_costs
+                om.flows[i, o].invest[i, o]
+                * om.flows[i, o].investment.ep_costs
             )
 
     return variable_costs + gradient_costs + investment_costs

@@ -34,8 +34,8 @@ input_output_parameters:
     path_folder_input: "./inputs/"
     path_folder_output: "./results/"
 
-# 4) Set rolling (myopic) horizon parameters (optional)
-rolling_horizon_parameters:
+# 4) Set myopic horizon parameters (optional)
+myopic_horizon_parameters:
     myopic_horizon_in_years: 4
     overlap_in_years: 0"""
     with open("./config.yml", "w") as opf:
