@@ -17,7 +17,6 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 """
 
 import pandas as pd
-import logging
 
 from pommesinvest.model_funcs.subroutines import (
     load_input_data,
@@ -28,16 +27,13 @@ from pommesinvest.model_funcs.subroutines import (
     create_demand_response_units,
     create_demand,
     create_excess_sinks,
-    create_existing_transformers,
+    create_exogenous_transformers,
     create_new_built_transformers,
-    create_existing_storages,
-    create_existing_storages_rolling_horizon,
+    create_new_built_transformers_rolling_horizon,
+    create_exogenous_storages,
+    create_exogenous_storages_rolling_horizon,
     create_new_built_storages,
     create_new_built_storages_rolling_horizon,
-    existing_transformers_exo_decom,
-    new_transformers_exo,
-    storages_exo,
-    renewables_exo,
 )
 from pommesinvest.model_funcs import helpers
 
@@ -67,9 +63,8 @@ def parse_input_data(im):
         "sources_commodity": "sources_commodity",
         "sources_renewables": "sources_renewables",
         "storages_el": "storages_el",
-        "existing_transformers": "transformers",
+        "exogenous_transformers": "transformers",
         "new_built_transformers": "new_built_transformers",
-        "exo_new_built_transformers": "exo_new_built_transformers",
     }
 
     time_series = {
@@ -77,13 +72,19 @@ def parse_input_data(im):
         "sources_renewables_ts": "sources_renewables_ts",
         "transformers_minload_ts": "transformers_minload_ts",
         "transformers_availability_ts": "transformers_availability_ts",
+        "exogenous_transformer_capacities": "transformer_capacities",
+        "exogenous_storages_capacities": "storages_capacities",
         "costs_fuel": f"costs_fuel_{im.fuel_cost_pathway}_nominal",
         "costs_fuel_ts": "costs_fuel_ts",
-        "costs_emissions": (f"costs_emissions_{im.emissions_cost_pathway}_nominal"),
+        "costs_emissions": (
+            f"costs_emissions_{im.emissions_cost_pathway}_nominal"
+        ),
         "costs_emissions_ts": "costs_emissions_ts",
         "costs_operation": "costs_operation_nominal",
         "costs_operation_storages": "costs_operation_storages_nominal",
-        "costs_investment": (f"costs_investment_{im.investment_cost_pathway}_nominal"),
+        "costs_investment": (
+            f"costs_investment_{im.investment_cost_pathway}_nominal"
+        ),
         "costs_storages_investment": (
             f"costs_storages_investment_{im.investment_cost_pathway}_nominal"
         ),
@@ -112,10 +113,12 @@ def parse_input_data(im):
         ] = f"sinks_demand_response_el_ts_{im.demand_response_scenario}"
 
         components["sinks_dr_el_ava_pos_ts"] = (
-            "sinks_demand_response_el_ava_pos_ts_" + im.demand_response_scenario
+            "sinks_demand_response_el_ava_pos_ts_"
+            + im.demand_response_scenario
         )
         components["sinks_dr_el_ava_neg_ts"] = (
-            "sinks_demand_response_el_ava_neg_ts_" + im.demand_response_scenario
+            "sinks_demand_response_el_ava_neg_ts_"
+            + im.demand_response_scenario
         )
 
     # Combine all files
@@ -123,7 +126,8 @@ def parse_input_data(im):
     input_files = {**input_files, **other_files}
 
     return {
-        key: load_input_data(filename=name, im=im) for key, name in input_files.items()
+        key: load_input_data(filename=name, im=im)
+        for key, name in input_files.items()
     }
 
 
@@ -142,7 +146,9 @@ def resample_input_data(input_data, im):
     transformer_data = ["existing_transformers", "new_built_transformers"]
     storage_data = ["storages_el", "new_built_storages_el"]
     annual_ts = [
-        "transformers_minload_ts",
+        "min_max_ts",
+        "exogenous_transformer_capacities",
+        "exogenous_storages_capacities",
         "costs_fuel",
         "costs_emissions",
         "costs_operation",
@@ -150,6 +156,7 @@ def resample_input_data(input_data, im):
     ]
     hourly_ts = [
         "transformers_availability_ts",
+        "transformers_minload_ts",
         "sinks_demand_el_ts",
         "sources_renewables_ts",
         "costs_fuel_ts",
@@ -161,16 +168,32 @@ def resample_input_data(input_data, im):
     for key in input_data.keys():
         if key in transformer_data:
             input_data[key].loc[
-                :, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]
+                :,
+                ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"],
             ] = (
                 input_data[key]
-                .loc[:, ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"]]
+                .loc[
+                    :,
+                    [
+                        "grad_pos",
+                        "grad_neg",
+                        "max_load_factor",
+                        "min_load_factor",
+                    ],
+                ]
                 .mul(im.multiplicator)
             )
         elif key in storage_data:
-            input_data[key] = input_data[key].where(pd.notnull(input_data[key]), None)
+            input_data[key] = input_data[key].where(
+                pd.notnull(input_data[key]), None
+            )
             input_data[key].loc[
-                :, ["max_storage_level", "min_storage_level", "nominal_storable_energy"]
+                :,
+                [
+                    "max_storage_level",
+                    "min_storage_level",
+                    "nominal_storable_energy",
+                ],
             ] = (
                 input_data[key]
                 .loc[
@@ -227,12 +250,14 @@ def add_components(input_data, im):
             input_data, im, node_dict
         )
 
-        node_dict = create_demand(input_data, im, node_dict, dr_overall_load_ts_df)
+        node_dict = create_demand(
+            input_data, im, node_dict, dr_overall_load_ts_df
+        )
     else:
         node_dict = create_demand(input_data, im, node_dict)
 
     node_dict = create_excess_sinks(input_data, node_dict)
-    node_dict = create_existing_transformers(input_data, im, node_dict)
+    node_dict = create_exogenous_transformers(input_data, im, node_dict)
 
     return node_dict
 
@@ -258,7 +283,9 @@ def add_limits(
         The emissions limit to be used (converted)
     """
     return helpers.convert_annual_limit(
-        input_data["emission_limits"][im.emission_pathway], im.starttime, im.endtime
+        input_data["emission_limits"][im.emission_pathway],
+        im.starttime,
+        im.endtime,
     )
 
 
@@ -284,7 +311,7 @@ def nodes_from_csv(im):
     node_dict = add_components(input_data, im)
 
     node_dict = create_new_built_transformers(input_data, im, node_dict)
-    node_dict = create_existing_storages(input_data, im, node_dict)
+    node_dict = create_exogenous_storages(input_data, im, node_dict)
     node_dict = create_new_built_storages(input_data, im, node_dict)
 
     emissions_limit = None
@@ -317,23 +344,38 @@ def nodes_from_csv_rolling_horizon(im, iteration_results):
     emissions_limit : int or None
         The overall emissions limit
 
-    storage_labels : :obj:`list` of :class:`str`
-        A list of the labels of all storage elements included in the model
-        used for assessing these and assigning initial states
+    transformer_and_storage_labels : :obj:`list` of :class:`str`
+        A list of the labels of all transformers and storages elements
+        included in the model used for assessing these
+        and assigning initial states
     """
     frequency_used = {
         "60min": (
             getattr(im, "time_slice_length_with_overlap"),
             "h",
         ),
-        "15min": (
-            getattr(im, "time_slice_length_with_overlap") * 15,
-            "min",
+        "4H": (
+            getattr(im, "time_slice_length_with_overlap") * 4,
+            "h",
+        ),
+        "8H": (
+            getattr(im, "time_slice_length_with_overlap") * 8,
+            "h",
+        ),
+        "24H": (
+            getattr(im, "time_slice_length_with_overlap") * 24,
+            "h",
+        ),
+        "48H": (
+            getattr(im, "time_slice_length_with_overlap") * 48,
+            "h",
         ),
     }[im.freq]
 
     # Update start time and end time of the model for retrieving the right data
-    im.start_time = getattr(im, "time_series_start").strftime("%Y-%m-%d %H:%M:%S")
+    im.start_time = getattr(im, "time_series_start").strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
     im.end_time = (
         getattr(im, "time_series_start")
         + pd.to_timedelta(frequency_used[0], frequency_used[1])
@@ -345,20 +387,29 @@ def nodes_from_csv_rolling_horizon(im, iteration_results):
     node_dict = add_components(input_data, im)
 
     # create storages and new-built transformers (rolling horizon)
-    node_dict, new_built_transformer_labels = create_existing_storages_rolling_horizon(
+    (
+        node_dict,
+        new_built_transformer_labels,
+    ) = create_new_built_transformers_rolling_horizon(
         input_data, im, node_dict, iteration_results
     )
 
-    node_dict, existing_storage_labels = create_existing_storages_rolling_horizon(
+    (
+        node_dict,
+        exogenous_storage_labels,
+    ) = create_exogenous_storages_rolling_horizon(
         input_data, im, node_dict, iteration_results
     )
-    node_dict, new_built_storage_labels = create_new_built_storages_rolling_horizon(
+    (
+        node_dict,
+        new_built_storage_labels,
+    ) = create_new_built_storages_rolling_horizon(
         input_data, im, node_dict, iteration_results
     )
 
-    storage_and_transformer_labels = (
+    transformer_and_storage_labels = (
         new_built_transformer_labels
-        + new_built_transformer_labels
+        + exogenous_storage_labels
         + new_built_storage_labels
     )
 
@@ -366,419 +417,4 @@ def nodes_from_csv_rolling_horizon(im, iteration_results):
     if im.activate_emissions_limit:
         emissions_limit = add_limits(input_data, im)
 
-    return (node_dict, emissions_limit, storage_and_transformer_labels)
-
-
-def exo_com_costs(
-    startyear,
-    endyear,
-    existing_transformers_decom_df,
-    new_transformers_de_com_df,
-    investment_costs_df,
-    WACC_df,
-    new_built_storages_df,
-    storage_turbine_investment_costs_df,
-    storage_pump_investment_costs_df,
-    storage_investment_costs_df,
-    renewables_com_df,
-    IR=0.02,
-    discount=False,
-):
-    """Function takes the dataframes from the functions total_exo_decommissioning,
-    transformers_exo_commissioning, storages_exo_commissioning and
-    renewables_exo_commissioning and returns them
-
-    Parameters
-    ----------
-    startyear : :obj:`int`
-        Starting year of the overall optimization run
-
-    endyear : :obj:`int`
-        End year of the overall optimization run
-
-    renewables_com_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the renewables data
-
-    storage_investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the storage capacity investment costs data
-
-    storage_pump_investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the storage infeed investment costs data
-
-    storage_turbine_investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the storage outfeed investment costs data
-
-    new_built_storages_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the new built storage units data
-
-    WACC_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the WACC data
-
-    investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the transformers investment costs data
-
-    new_transformers_de_com_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the new built transformers (exogeneous)
-        commissioning and decommissioning data
-
-    existing_transformers_decom_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the existing transformers (exogeneous)
-        decommissioning data
-
-    Returns
-    -------
-    total_exo_com_costs_df : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous commissioning costs
-
-    exo_commissioned_capacity_df : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous commissioning capacity and year
-
-    exo_decommissioned_capacity_df : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous decommissioning capacity and year
-
-    """
-
-    existing_transformers_decom_capacity_df = existing_transformers_exo_decom(
-        existing_transformers_decom_df, startyear, endyear
-    )
-
-    (
-        new_transformers_exo_com_costs_df,
-        new_transformers_exo_com_capacity_df,
-        new_transformers_exo_decom_capacity_df,
-    ) = new_transformers_exo(
-        new_transformers_de_com_df,
-        investment_costs_df,
-        WACC_df,
-        startyear,
-        endyear,
-        IR=IR,
-        discount=discount,
-    )
-
-    logging.info(
-        "Exogenous transformers costs: {:,.0f}".format(
-            new_transformers_exo_com_costs_df.sum().sum()
-        )
-    )
-
-    (
-        storages_exo_com_costs_df,
-        storages_exo_com_capacity_df,
-        storages_exo_decom_capacity_df,
-    ) = storages_exo(
-        new_built_storages_df,
-        storage_turbine_investment_costs_df,
-        storage_pump_investment_costs_df,
-        storage_investment_costs_df,
-        WACC_df,
-        startyear,
-        endyear,
-        IR=IR,
-        discount=discount,
-    )
-
-    logging.info(
-        "Exogenous storages costs: {:,.0f}".format(
-            storages_exo_com_costs_df.sum().sum()
-        )
-    )
-
-    (
-        renewables_exo_com_costs_df,
-        renewables_exo_com_capacity_df,
-        renewables_exo_decom_capacity_df,
-    ) = renewables_exo(
-        renewables_com_df,
-        investment_costs_df,
-        WACC_df,
-        startyear,
-        endyear,
-        IR=IR,
-        discount=discount,
-    )
-
-    logging.info(
-        "Exogenous renewables costs: {:,.0f}".format(
-            renewables_exo_com_costs_df.sum().sum()
-        )
-    )
-
-    total_exo_com_costs_df = pd.concat(
-        [
-            new_transformers_exo_com_costs_df,
-            storages_exo_com_costs_df,
-            renewables_exo_com_costs_df,
-        ],
-        axis=0,
-        sort=False,
-    )
-
-    total_exo_com_capacity_df = pd.concat(
-        [
-            new_transformers_exo_com_capacity_df,
-            storages_exo_com_capacity_df,
-            renewables_exo_com_capacity_df,
-        ],
-        axis=0,
-        sort=True,
-    )
-
-    total_exo_decom_capacity_df = pd.concat(
-        [
-            existing_transformers_decom_capacity_df,
-            new_transformers_exo_decom_capacity_df,
-            storages_exo_decom_capacity_df,
-            renewables_exo_decom_capacity_df,
-        ],
-        axis=0,
-        sort=True,
-    )
-
-    return (
-        total_exo_com_costs_df,
-        total_exo_com_capacity_df,
-        total_exo_decom_capacity_df,
-    )
-
-
-def exo_com_costs_RH(
-    startyear,
-    endyear,
-    counter,
-    years_per_timeslice,
-    total_exo_com_costs_df_RH,
-    total_exo_com_capacity_df_RH,
-    total_exo_decom_capacity_df_RH,
-    existing_transformers_decom_df,
-    new_transformers_de_com_df,
-    investment_costs_df,
-    WACC_df,
-    new_built_storages_df,
-    storage_turbine_investment_costs_df,
-    storage_pump_investment_costs_df,
-    storage_investment_costs_df,
-    renewables_com_df,
-    IR=0.02,
-    discount=False,
-):
-    """Function takes the dataframes from the functions total_exo_decommissioning,
-    transformers_exo_commissioning, storages_exo_commissioning and
-    renewables_exo_commissioning and returns them
-
-    Parameters
-    ----------
-    startyear : :obj:`int`
-        Starting year of the overall optimization run
-
-    endyear : :obj:`int`
-        End year of the overall optimization run
-
-    counter : :obj:`int`
-        An integer counter variable counting the number of the rolling horizon run
-
-    years_per_timeslice : :obj:`int`
-        Useful length of optimization timeframe (t_intervall)
-
-    IR : :obj:`pandas.DataFrame`
-        A pd.DataFrame carrying the WACC information by technology / energy carrier
-
-    total_exo_com_costs_df_RH : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous commissioning costs
-
-    total_exo_com_capacity_df_RH : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous commissioning capacity and year
-
-    total_exo_decom_capacity_df_RH : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous decommissioning capacity and year
-
-    discount : :obj:`boolean`
-        If True, nominal values will be dicounted
-        If False, real values have to be used as model inputs (default)
-
-    renewables_com_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the renewables data
-
-    storage_investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the storage capacity investment costs data
-
-    storage_pump_investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the storage infeed investment costs data
-
-    storage_turbine_investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the storage outfeed investment costs data
-
-    new_built_storages_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the new built storage units data
-
-    WACC_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the WACC data
-
-    investment_costs_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the transformers investment costs data
-
-    new_transformers_de_com_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the new built transformers (exogeneous)
-        commissioning and decommissioning data
-
-    existing_transformers_decom_df: :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the existing transformers (exogeneous)
-        decommissioning data
-    Returns
-    -------
-    exo_com_cost_df_total_RH : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous commissioning costs including the
-        data from the actual myopic run
-
-    exo_commissioned_capacity_df_total_RH : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous commissioning capacity and year
-        including the data from the actual myopic run
-
-    exo_decommissioned_capacity_df_total_RH : :obj:`pandas.DataFrame`
-        A pd.DataFrame containing the exogenous decommissioning capacity and year
-        including the data from the actual myopic run
-    """
-
-    RH_startyear = startyear + (counter * years_per_timeslice)
-    if (startyear + ((counter + 1) * years_per_timeslice) - 1) > endyear:
-        RH_endyear = endyear
-    else:
-        RH_endyear = startyear + (((counter + 1) * years_per_timeslice) - 1)
-
-    existing_transformers_decom_capacity_df_RH = existing_transformers_exo_decom(
-        existing_transformers_decom_df, startyear=RH_startyear, endyear=RH_endyear
-    )
-
-    (
-        new_transformers_exo_com_costs_df_RH,
-        new_transformers_exo_com_capacity_df_RH,
-        new_transformers_exo_decom_capacity_df_RH,
-    ) = new_transformers_exo(
-        new_transformers_de_com_df,
-        investment_costs_df,
-        WACC_df,
-        startyear=RH_startyear,
-        endyear=RH_endyear,
-        IR=IR,
-        discount=discount,
-    )
-
-    # Discount annuities to overall_startyear
-    if discount:
-        new_transformers_exo_com_costs_df_RH = discount_values(
-            new_transformers_exo_com_costs_df_RH, IR, RH_startyear, startyear
-        )
-
-    logging.info(
-        "Exogenous transformers costs for run {:d}: {:,.0f}".format(
-            counter, new_transformers_exo_com_costs_df_RH.sum().sum()
-        )
-    )
-
-    (
-        storages_exo_com_costs_df_RH,
-        storages_exo_com_capacity_df_RH,
-        storages_exo_decom_capacity_df_RH,
-    ) = storages_exo(
-        new_built_storages_df,
-        storage_turbine_investment_costs_df,
-        storage_pump_investment_costs_df,
-        storage_investment_costs_df,
-        WACC_df,
-        startyear=RH_startyear,
-        endyear=RH_endyear,
-        IR=IR,
-        discount=discount,
-    )
-
-    # Discount annuities to overall_startyear
-    if discount:
-        storages_exo_com_costs_df_RH = discount_values(
-            storages_exo_com_costs_df_RH, IR, RH_startyear, startyear
-        )
-
-    logging.info(
-        "Exogenous storages costs for run {:d}: {:,.0f}".format(
-            counter, storages_exo_com_costs_df_RH.sum().sum()
-        )
-    )
-
-    (
-        renewables_exo_com_costs_df_total_RH,
-        renewables_exo_com_capacity_renewables_df_RH,
-        renewables_exo_decom_capacity_df_RH,
-    ) = renewables_exo(
-        renewables_com_df,
-        investment_costs_df,
-        WACC_df,
-        startyear=RH_startyear,
-        endyear=RH_endyear,
-        IR=IR,
-        discount=discount,
-    )
-
-    # Discount annuities to overall_startyear
-    if discount:
-        renewables_exo_com_costs_df_total_RH = discount_values(
-            renewables_exo_com_costs_df_total_RH, IR, RH_startyear, startyear
-        )
-
-    logging.info(
-        "Exogenous renewables costs for run {:d}: {:,.0f}".format(
-            counter, renewables_exo_com_costs_df_total_RH.sum().sum()
-        )
-    )
-
-    total_exo_com_costs_df_RH_iteration = pd.concat(
-        [
-            new_transformers_exo_com_costs_df_RH,
-            storages_exo_com_costs_df_RH,
-            renewables_exo_com_costs_df_total_RH,
-        ],
-        axis=0,
-        sort=True,
-    )
-
-    total_exo_com_capacity_df_RH_iteration = pd.concat(
-        [
-            new_transformers_exo_com_capacity_df_RH,
-            storages_exo_com_capacity_df_RH,
-            renewables_exo_com_capacity_renewables_df_RH,
-        ],
-        axis=0,
-        sort=True,
-    )
-
-    total_exo_decom_capacity_df_RH_iteration = pd.concat(
-        [
-            existing_transformers_decom_capacity_df_RH,
-            new_transformers_exo_decom_capacity_df_RH,
-            storages_exo_decom_capacity_df_RH,
-            renewables_exo_decom_capacity_df_RH,
-        ],
-        axis=0,
-        sort=True,
-    )
-
-    # Combine the results from previous iterations with the one of the current iteration
-    total_exo_com_costs_df_RH = pd.concat(
-        [total_exo_com_costs_df_RH, total_exo_com_costs_df_RH_iteration],
-        axis=1,
-        sort=True,
-    )
-    total_exo_com_capacity_df_RH = pd.concat(
-        [total_exo_com_capacity_df_RH, total_exo_com_capacity_df_RH_iteration],
-        axis=1,
-        sort=True,
-    )
-    total_exo_decom_capacity_df_RH = pd.concat(
-        [total_exo_decom_capacity_df_RH, total_exo_decom_capacity_df_RH_iteration],
-        axis=1,
-        sort=True,
-    )
-
-    return (
-        total_exo_com_costs_df_RH,
-        total_exo_com_capacity_df_RH,
-        total_exo_decom_capacity_df_RH,
-    )
+    return (node_dict, emissions_limit, transformer_and_storage_labels)
