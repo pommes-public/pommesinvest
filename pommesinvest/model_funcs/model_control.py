@@ -30,8 +30,6 @@ from pommesinvest.model_funcs.data_input import (
 
 import pandas as pd
 
-import oemof.solph as solph
-
 
 # Consider idealistic years, ignoring leap years and weekdays
 FREQUENCY_TO_TIMESTEPS = {
@@ -413,7 +411,7 @@ class InvestmentModel(object):
         )
 
         setattr(self, "filename", filename)
-        logger.define_logging(logfile=filename + ".log")
+        logger.define_logging(logfile=f"{filename}.log")
 
         return filename
 
@@ -526,8 +524,9 @@ class InvestmentModel(object):
     def build_myopic_horizon_model(self, counter, iteration_results):
         r"""Set up and return a myopic horizon LP dispatch model
 
-        Track the storage labels in order to obtain and pass initial
-        storage levels for each iteration. Set the end time of an iteration
+        Track the transformer and storage labels in order to obtain and pass
+        transformer and storage investments as well as initial storage levels
+        for each iteration. Set the end time of an iteration
         excluding the overlap to the start of the next iteration.
 
         Parameters
@@ -559,14 +558,14 @@ class InvestmentModel(object):
         (
             node_dict,
             emissions_limit,
-            storage_and_transformer_labels,
+            transformer_and_storage_labels,
         ) = nodes_from_csv_myopic_horizon(self, iteration_results)
         # Only set storage and transformer labels attribute for the 0th iteration
-        if not hasattr(self, "storage_and_transformer_labels"):
+        if not hasattr(self, "transformer_and_storage_labels"):
             setattr(
                 self,
-                "storage_and_transformer_labels",
-                storage_and_transformer_labels,
+                "transformer_and_storage_labels",
+                transformer_and_storage_labels,
             )
 
         # Update model start time for the next iteration
@@ -634,7 +633,10 @@ class InvestmentModel(object):
         iter_results["dispatch_results"] = iter_results[
             "dispatch_results"
         ].append(sliced_dispatch_results)
-        iter_results["investment_results"] = electricity_bus["scalars"]
+        iteration_investments = electricity_bus["scalars"]
+        iter_results["investment_results"] = iter_results[
+            "dispatch_results"
+        ].append(iteration_investments, axis=1)
 
         meta_results = processing.meta_results(self.om)
         # Objective is weighted in order to take overlap into account
@@ -656,12 +658,33 @@ class InvestmentModel(object):
             A dictionary holding the results of the previous myopic horizon
             iteration
         """
-        iteration_results["storages_existing"] = pd.DataFrame(
-            columns=["initial_storage_level_last_iteration"],
-            index=getattr(self, "existing_storage_labels"),
-        )
+        if iteration_results["new_built_transformers"].empty:
+            iteration_results["new_built_tansformers"] = pd.DataFrame(
+                columns=["existing_capacity"],
+                index=getattr(self, "transformer_and_storage_labels")[
+                    "new_built_transformers"
+                ],
+                # Intialize with zero value
+                data=0,
+            )
 
-        for i, s in iteration_results["storages_existing"].iterrows():
+        for i, s in iteration_results["new_built_tansformers"].iterrows():
+            transformer = views.node(iteration_results["model_results"], i)
+
+            # Increase capacity by results of each iteration
+            iteration_results["new_built_tansformers"].at[
+                i, "existing_capacity"
+            ] += transformer["scalars"][((i, "DE_bus_el"), "invest")]
+
+        if iteration_results["storages_exogenous"].empty:
+            iteration_results["storages_exogenous"] = pd.DataFrame(
+                columns=["initial_storage_level_last_iteration"],
+                index=getattr(self, "transformer_and_storage_labels")[
+                    "exogenous_storages"
+                ],
+            )
+
+        for i, s in iteration_results["storages_exogenous"].iterrows():
             storage = views.node(iteration_results["model_results"], i)
 
             iteration_results["storages_existing"].at[
@@ -670,15 +693,19 @@ class InvestmentModel(object):
                 getattr(self, "time_slice_length_wo_overlap_in_time_steps") - 1
             ]
 
-        iteration_results["storages_new_built"] = pd.DataFrame(
-            columns=[
-                "initial_storage_level_last_iteration",
-                "existing_inflow_power",
-                "existing_outflow_power",
-                "existing_capacity_storage",
-            ],
-            index=getattr(self, "new_built_storage_labels"),
-        )
+        if iteration_results["storages_new_built"].empty:
+            iteration_results["storages_new_built"] = pd.DataFrame(
+                columns=[
+                    "initial_storage_level_last_iteration",
+                    "existing_inflow_power",
+                    "existing_outflow_power",
+                    "existing_capacity_storage",
+                ],
+                index=getattr(self, "transformer_and_storage_labels")[
+                    "new_built_storages"
+                ],
+                data=0,
+            )
 
         for i, s in iteration_results["storages_new_built"].iterrows():
             storage = views.node(iteration_results["model_results"], i)
@@ -691,14 +718,16 @@ class InvestmentModel(object):
 
             iteration_results["storages_new_built"].at[
                 i, "existing_inflow_power"
-            ] = storage["scalars"].loc[(("DE_bus_el", i), "invest")]
+            ] += storage["scalars"].loc[(("DE_bus_el", i), "invest")]
 
             iteration_results["storages_new_built"].at[
                 i, "existing_outflow_power"
-            ] = storage["scalars"].loc[((i, "DE_bus_el"), "invest")]
+            ] += storage["scalars"].loc[((i, "DE_bus_el"), "invest")]
 
             iteration_results["storages_new_built"].at[
                 i, "existing_capacity_storage"
-            ] = storage["scalars"].loc[((i, "None"), "invest")]
+            ] += storage["scalars"].loc[((i, "None"), "invest")]
 
-        logging.info("Obtained initial (storage) levels for next iteration")
+        logging.info(
+            "Obtained initial (transformer and storage) levels for next iteration"
+        )

@@ -789,7 +789,7 @@ def create_new_built_transformers_myopic_horizon(
         if not iteration_results["new_built_transformers"].empty:
             existing_capacity = iteration_results[
                 "new_built_transformers"
-            ].loc[i, "capacity_cumulated"]
+            ].loc[i, "existing_capacity"]
         else:
             # Set existing capacity for 0th iteration
             existing_capacity = 0
@@ -990,9 +990,9 @@ def create_exogenous_storages_myopic_horizon(
     for i, s in input_data["storages_el"].iterrows():
 
         exogenous_storage_labels.append(i)
-        if not iteration_results["storages_initial"].empty:
+        if not iteration_results["exogenous_storages"].empty:
             initial_storage_level_last_iteration = (
-                iteration_results["storages_initial"].loc[
+                iteration_results["exogenous_storages"].loc[
                     i, "initial_storage_level_last_iteration"
                 ]
                 / s["nominal_storable_energy"]
@@ -1248,14 +1248,14 @@ def create_new_built_storages_myopic_horizon(
 
     for i, s in input_data["new_built_storages"].iterrows():
 
-        if not iteration_results["storages_new_built"].empty:
-            existing_pump = iteration_results["storages_new_built"].loc[
+        if not iteration_results["new_built_storages"].empty:
+            existing_pump = iteration_results["new_built_storages"].loc[
                 i, "existing_inflow_power"
             ]
-            existing_turbine = iteration_results["storages_new_built"].loc[
+            existing_turbine = iteration_results["new_built_storages"].loc[
                 i, "existing_outflow_power"
             ]
-            existing = iteration_results["storages_new_built"].loc[
+            existing = iteration_results["new_built_storages"].loc[
                 i, "existing_capacity_storage"
             ]
 
@@ -1268,7 +1268,7 @@ def create_new_built_storages_myopic_horizon(
         # Prevent potential zero division for storage states
         if existing != 0:
             initial_storage_level_last_iteration = (
-                iteration_results["storages_new_built"].loc[
+                iteration_results["new_built_storages"].loc[
                     i, "initial_storage_level_last_iteration"
                 ]
                 / existing

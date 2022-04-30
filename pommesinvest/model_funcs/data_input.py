@@ -29,11 +29,11 @@ from pommesinvest.model_funcs.subroutines import (
     create_excess_sinks,
     create_exogenous_transformers,
     create_new_built_transformers,
-    create_new_built_transformers_rolling_horizon,
+    create_new_built_transformers_myopic_horizon,
     create_exogenous_storages,
-    create_exogenous_storages_rolling_horizon,
+    create_exogenous_storages_myopic_horizon,
     create_new_built_storages,
-    create_new_built_storages_rolling_horizon,
+    create_new_built_storages_myopic_horizon,
 )
 from pommesinvest.model_funcs import helpers
 
@@ -223,7 +223,7 @@ def add_components(input_data, im):
 
     Note: Storages and new-built transformers are not included here.
     They have to be defined separately since the approaches differ
-    between rolling horizon and simple model.
+    between myopic horizon and simple model.
 
     Parameters
     ----------
@@ -324,8 +324,8 @@ def nodes_from_csv(im):
     return node_dict, emissions_limit
 
 
-def nodes_from_csv_rolling_horizon(im, iteration_results):
-    r"""Read in csv files and build components for a rolling horizon run
+def nodes_from_csv_myopic_horizon(im, iteration_results):
+    r"""Read in csv files and build components for a myopic horizon run
 
     Parameters
     ----------
@@ -333,7 +333,7 @@ def nodes_from_csv_rolling_horizon(im, iteration_results):
         The investment model that is considered
 
     iteration_results : dict
-        A dictionary holding the results of the previous rolling horizon
+        A dictionary holding the results of the previous myopic horizon
         iteration
 
     Returns
@@ -344,33 +344,17 @@ def nodes_from_csv_rolling_horizon(im, iteration_results):
     emissions_limit : int or None
         The overall emissions limit
 
-    transformer_and_storage_labels : :obj:`list` of :class:`str`
-        A list of the labels of all transformers and storages elements
+    transformer_and_storage_labels : :obj:`dict`
+        dictionary containing the labels of all transformers and storages elements
         included in the model used for assessing these
         and assigning initial states
     """
-    frequency_used = {
-        "60min": (
-            getattr(im, "time_slice_length_with_overlap"),
+    frequency_used = (
+        (
+            getattr(im, "time_slice_length_with_overlap") * im.multiplicator,
             "h",
         ),
-        "4H": (
-            getattr(im, "time_slice_length_with_overlap") * 4,
-            "h",
-        ),
-        "8H": (
-            getattr(im, "time_slice_length_with_overlap") * 8,
-            "h",
-        ),
-        "24H": (
-            getattr(im, "time_slice_length_with_overlap") * 24,
-            "h",
-        ),
-        "48H": (
-            getattr(im, "time_slice_length_with_overlap") * 48,
-            "h",
-        ),
-    }[im.freq]
+    )
 
     # Update start time and end time of the model for retrieving the right data
     im.start_time = getattr(im, "time_series_start").strftime(
@@ -386,35 +370,35 @@ def nodes_from_csv_rolling_horizon(im, iteration_results):
 
     node_dict = add_components(input_data, im)
 
-    # create storages and new-built transformers (rolling horizon)
+    # create storages and new-built transformers (myopic horizon)
     (
         node_dict,
         new_built_transformer_labels,
-    ) = create_new_built_transformers_rolling_horizon(
+    ) = create_new_built_transformers_myopic_horizon(
         input_data, im, node_dict, iteration_results
     )
 
     (
         node_dict,
         exogenous_storage_labels,
-    ) = create_exogenous_storages_rolling_horizon(
+    ) = create_exogenous_storages_myopic_horizon(
         input_data, im, node_dict, iteration_results
     )
     (
         node_dict,
         new_built_storage_labels,
-    ) = create_new_built_storages_rolling_horizon(
+    ) = create_new_built_storages_myopic_horizon(
         input_data, im, node_dict, iteration_results
     )
 
-    transformer_and_storage_labels = (
-        new_built_transformer_labels
-        + exogenous_storage_labels
-        + new_built_storage_labels
-    )
+    transformer_and_storage_labels = {
+        "new_built_tranformers": new_built_transformer_labels,
+        "exogenous_storages": exogenous_storage_labels,
+        "new_built_storages": new_built_storage_labels,
+    }
 
     emissions_limit = None
     if im.activate_emissions_limit:
         emissions_limit = add_limits(input_data, im)
 
-    return (node_dict, emissions_limit, transformer_and_storage_labels)
+    return node_dict, emissions_limit, transformer_and_storage_labels
