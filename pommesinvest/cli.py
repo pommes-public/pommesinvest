@@ -6,7 +6,8 @@ def create_default_config():
 
 # 1) Set overall workflow control parameters
 control_parameters:
-    rolling_horizon: False
+    multi_period: True
+    myopic_horizon: False
     aggregate_input: False
     interest_rate: 0.02
     solver: "gurobi"

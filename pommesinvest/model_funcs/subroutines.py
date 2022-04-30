@@ -364,13 +364,13 @@ def create_demand_response_units(input_data, im, node_dict):
                     im.start_time : im.end_time
                 ]
             ),
-            "flex_share_up": d["FLEX_SHARE_UP"],
+            "flex_share_up": d["flex_share_up"],
             "capacity_down": np.array(
                 input_data["sinks_dr_el_ava_pos_ts"][i].loc[
                     im.start_time : im.end_time
                 ]
             ),
-            "flex_share_down": d["FLEX_SHARE_DOWN"],
+            "flex_share_down": d["flex_share_down"],
             "delay_time": math.ceil(d["shifting_duration"]),
             "shed_time": 1,
             "recovery_time_shed": 0,
@@ -404,6 +404,33 @@ def create_demand_response_units(input_data, im, node_dict):
             "oemof": {"approach": "oemof", "shift_interval": 24},
         }
 
+        invest_kwargs = {
+            "minimum": 0,
+            "maximum": min(
+                d["max_cap"] + d["potential_neg_overall"],
+                d["installed_cap"],
+            ),
+            "ep_costs": economics.annuity(
+                # TODO: Add individual entries for investment expenses to data basis
+                capex=input_data["investment_costs"].loc[i, im.startyear],
+                n=d["unit_lifetime"],
+                wacc=input_data["wacc"].loc[d["technology"], im.startyear],
+            ),
+        }
+
+        if im.multi_period:
+            invest_kwargs["ep_costs"] = (
+                input_data["investment_costs"].loc[i, im.startyear],
+            )
+            multi_period_invest_kwargs = {
+                "lifetime": d["lifetime"],
+                "age": 0,
+                "interest_rate": d["interest_rate"],
+                "fixed_costs": d["fixed_costs"],
+                "overall_maximum": d["overall_maximum"],
+            }
+            invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
+
         # TODO: Critically check min and max invest params
         approach_dict = {
             "DLR": solph.components.experimental.SinkDSM(
@@ -413,14 +440,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 },
                 **kwargs_all,
                 **kwargs_dict["DLR"],
-                invest=solph.Investment(
-                    minimum=0,
-                    maximum=min(
-                        d["max_cap"] + d["potential_neg_overall"],
-                        d["installed_cap"],
-                    ),
-                    ep_costs=d["specific_investments"] * 1e3,
-                ),
+                invest=solph.Investment(**invest_kwargs),
             ),
             "DIW": solph.components.experimental.SinkDSM(
                 label=i,
@@ -429,14 +449,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 },
                 **kwargs_all,
                 **kwargs_dict["DIW"],
-                invest=solph.Investment(
-                    minimum=0,
-                    maximum=min(
-                        d["max_cap"] + d["potential_neg_overall"],
-                        d["installed_cap"],
-                    ),
-                    ep_costs=d["specific_investments"] * 1e3,
-                ),
+                invest=solph.Investment(**invest_kwargs),
             ),
             "oemof": solph.components.experimental.SinkDSM(
                 label=i,
@@ -445,14 +458,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 },
                 **kwargs_all,
                 **kwargs_dict["oemof"],
-                invest=solph.Investment(
-                    minimum=0,
-                    maximum=min(
-                        d["max_cap"] + d["potential_neg_overall"],
-                        d["installed_cap"],
-                    ),
-                    ep_costs=d["specific_investments"] * 1e3,
-                ),
+                invest=solph.Investment(**invest_kwargs),
             ),
         }
 
@@ -705,6 +711,34 @@ def create_new_built_transformers(
         else:
             invest_max = 10000000.0
 
+        invest_kwargs = {
+            "maximum": invest_max,
+            # New built plants are installed at capacity costs for the start year
+            # (of each myopic iteration = investment possibility)
+            "ep_costs": economics.annuity(
+                capex=input_data["investment_costs"].loc[
+                    t["technology"], im.startyear
+                ],
+                n=t["unit_lifetime"],
+                wacc=input_data["wacc"].loc[t["technology"], im.startyear],
+            ),
+            "existing": 0,
+        }
+        if im.multi_period:
+            invest_max = annual_invest_limit
+            invest_kwargs["maximum"] = invest_max
+            invest_kwargs["ep_costs"] = input_data["investment_costs"].loc[
+                t["technology"], im.startyear
+            ]
+            multi_period_invest_kwargs = {
+                "lifetime": t["lifetime"],
+                "age": 0,
+                "interest_rate": t["interest_rate"],
+                "fixed_costs": t["fixed_costs"],
+                "overall_maximum": overall_invest_limit,
+            }
+            invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
+
         # TODO: Define minimum investment / output requirement for CHP units
         # (also heat pumps etc as providers of district heating)
         outflow_args_el = {
@@ -719,21 +753,7 @@ def create_new_built_transformers(
             ).to_numpy(),
             "min": t["min"],
             "max": t["max"],
-            "investment": solph.Investment(
-                maximum=invest_max,
-                # New built plants are installed at capacity costs for the start year
-                # (of each myopic iteration = investment possibility)
-                ep_costs=economics.annuity(
-                    capex=input_data["investment_costs"].loc[
-                        t["bus_technology"], im.startyear
-                    ],
-                    n=t["unit_lifetime"],
-                    wacc=input_data["wacc"].loc[
-                        t["bus_technology"], im.startyear
-                    ],
-                ),
-                existing=0,
-            ),
+            "investment": solph.Investment(**invest_kwargs),
         }
 
         node_dict[i] = build_condensing_transformer(
@@ -1139,6 +1159,93 @@ def create_new_built_storages(input_data, im, node_dict):
 
         wacc = input_data["wacc"].loc[i, im.startyear]
 
+        invest_kwargs = {
+            "inflow": {
+                "maximum": invest_max_pump,
+                "ep_costs": economics.annuity(
+                    capex=input_data["storage_pump_investment_costs"].loc[
+                        i, im.startyear
+                    ],
+                    n=s["unit_lifetime_pump"],
+                    wacc=wacc,
+                ),
+                "existing": 0,
+            },
+            "outflow": {
+                "maximum": invest_max_turbine,
+                "ep_costs": economics.annuity(
+                    capex=input_data["storage_turbine_investment_costs"].loc[
+                        i, im.startyear
+                    ],
+                    n=s["unit_lifetime_turbine"],
+                    wacc=wacc,
+                ),
+                "existing": 0,
+            },
+            "capacity": {
+                "maximum": invest_max,
+                "ep_costs": economics.annuity(
+                    capex=input_data["storage_investment_costs"].loc[
+                        i, im.startyear
+                    ],
+                    n=s["unit_lifetime"],
+                    wacc=wacc,
+                ),
+                "existing": 0,
+            },
+        }
+
+        if im.multi_period:
+            invest_max_pump = annual_invest_limit_pump
+            invest_max_turbine = annual_invest_limit_turbine
+            invest_max = annual_invest_limit
+            invest_kwargs["inflow"]["maximum"] = invest_max_pump
+            invest_kwargs["outflow"]["maximum"] = invest_max_turbine
+            invest_kwargs["capacity"]["maximum"] = invest_max
+
+            invest_kwargs["inflow"]["ep_costs"] = (
+                input_data["storage_pump_investment_costs"].loc[
+                    i, im.startyear
+                ],
+            )
+            invest_kwargs["ouflow"]["ep_costs"] = (
+                input_data["storage_turbine_investment_costs"].loc[
+                    i, im.startyear
+                ],
+            )
+            invest_kwargs["capacity"]["ep_costs"] = (
+                input_data["storage_investment_costs"].loc[i, im.startyear],
+            )
+
+            multi_period_invest_kwargs = {
+                "inflow": {
+                    "lifetime": s["lifetime_pump"],
+                    "age": 0,
+                    "interest_rate": s["interest_rate"],
+                    "fixed_costs": s["fixed_costs_pump"],
+                    "overall_maximum": overall_invest_limit_pump,
+                },
+                "outflow": {
+                    "lifetime": s["lifetime_turbine"],
+                    "age": 0,
+                    "interest_rate": s["interest_rate"],
+                    "fixed_costs": s["fixed_costs_turbine"],
+                    "overall_maximum": overall_invest_limit_turbine,
+                },
+                "capacity": {
+                    "lifetime": s["lifetime"],
+                    "age": 0,
+                    "interest_rate": s["interest_rate"],
+                    "fixed_costs": s["fixed_costs_turbine"],
+                    "overall_maximum": overall_invest_limit_turbine,
+                },
+            }
+
+            invest_kwargs = {
+                key: {**invest_kwargs[key], **multi_period_invest_kwargs[key]}
+                for key in invest_kwargs.keys()
+            }
+
         node_dict[i] = solph.components.GenericStorage(
             label=i,
             inputs={
@@ -1150,17 +1257,7 @@ def create_new_built_storages(input_data, im, node_dict):
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
-                    investment=solph.Investment(
-                        maximum=invest_max_pump,
-                        ep_costs=economics.annuity(
-                            capex=input_data[
-                                "storage_pump_investment_costs"
-                            ].loc[i, im.startyear],
-                            n=s["unit_lifetime_pump"],
-                            wacc=wacc,
-                        ),
-                        existing=0,
-                    ),
+                    investment=solph.Investment(**invest_kwargs["inflow"]),
                 )
             },
             outputs={
@@ -1172,17 +1269,7 @@ def create_new_built_storages(input_data, im, node_dict):
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
-                    investment=solph.Investment(
-                        maximum=invest_max_turbine,
-                        ep_costs=economics.annuity(
-                            capex=input_data[
-                                "storage_turbine_investment_costs"
-                            ].loc[i, im.startyear],
-                            n=s["unit_lifetime_turbine"],
-                            wacc=wacc,
-                        ),
-                        existing=0,
-                    ),
+                    investment=solph.Investment(**invest_kwargs["outflow"]),
                 )
             },
             loss_rate=s["loss_rate"],
@@ -1195,17 +1282,7 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_relation_output_capacity=s[
                 "invest_relation_output_capacity"
             ],
-            investment=solph.Investment(
-                maximum=invest_max,
-                ep_costs=economics.annuity(
-                    capex=input_data["storage_investment_costs"].loc[
-                        i, im.startyear
-                    ],
-                    n=s["unit_lifetime"],
-                    wacc=wacc,
-                ),
-                existing=0,
-            ),
+            investment=solph.Investment(**invest_kwargs),
         )
 
     return node_dict

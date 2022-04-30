@@ -232,6 +232,7 @@ class InvestmentModel(object):
 
     def __init__(self):
         """Initialize an empty InvestmentModel object"""
+        self.multi_period = None
         self.myopic_horizon = None
         self.aggregate_input = None
         self.interest_rate = None
@@ -451,7 +452,12 @@ class InvestmentModel(object):
         datetime_index = pd.date_range(
             self.start_time, self.end_time, freq=self.freq
         )
-        es = network.EnergySystem(timeindex=datetime_index)
+        if self.multi_period:
+            es = network.EnergySystem(
+                timeindex=datetime_index, multi_period=True
+            )
+        else:
+            es = network.EnergySystem(timeindex=datetime_index)
 
         nodes_dict, emissions_limit = nodes_from_csv(self)
 
@@ -538,6 +544,13 @@ class InvestmentModel(object):
             A dictionary holding the results of the previous myopic horizon
             iteration
         """
+        if self.multi_period:
+            msg = (
+                "A model cannot be a myopic horizon model and a multi-period model at once.\n"
+                "Please choose one of both in the configuration and rerun."
+            )
+            raise ValueError(msg)
+
         logging.info(f"Starting optimization for optimization run {counter}")
         logging.info(
             f"Start of iteration {counter}: "
