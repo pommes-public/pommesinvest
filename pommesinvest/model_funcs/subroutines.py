@@ -23,11 +23,11 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 
 # Import necessary packages for function definitions
 import math
-import pandas as pd
-import numpy as np
 
-from oemof.tools import economics
+import numpy as np
 import oemof.solph as solph
+import pandas as pd
+from oemof.tools import economics
 
 
 def load_input_data(filename=None, im=None):
@@ -242,6 +242,9 @@ def create_renewables(input_data, im, node_dict):
                     node_dict[re["to"]]: solph.flows.Flow(
                         fix=np.array(
                             input_data["sources_renewables_ts"][i][
+                                im.start_time : im.end_time
+                            ]
+                            * input_data["sources_renewables_capacity_ts"][i][
                                 im.start_time : im.end_time
                             ]
                         ),
@@ -578,6 +581,7 @@ def create_exogeneous_transformers(
         # for commissiong of new / decommissioning existing units
 
         # TODO: Define minimum investment requirement for CHP units (also heat pumps etc as providers)
+        # HACK: Use minimum and maximum to depict existing capacities for a certain year
         minimum = (
             input_data["min_max_timeseries"].loc[
                 im.starttime : im.endtime, (i, "min")
@@ -590,10 +594,8 @@ def create_exogeneous_transformers(
         ).to_numpy()
 
         outflow_args_el = {
-            "nominal_value": t["capacity"]
-            * input_data["exogenous_transformers_capacities"].at[
-                i, im.start_year
-            ],
+            # Nominal value is the maximum caacity; actual existing is derived from minimum and maximum
+            "nominal_value": t["capacity_max"],
             "variable_costs": (
                 input_data["costs_operation_ts"].loc[
                     im.starttime : im.endtime, ("operation_costs", t["from"])
@@ -608,7 +610,7 @@ def create_exogeneous_transformers(
         # TODO: Create aggregated minimum load profiles!
         if t["type"] == "chp":
             if t["identifier"] in input_data["min_loads_dh"].columns:
-                outflow_args_el["min"] = (
+                outflow_args_el["min"] *= (
                     input_data["min_loads_dh"]
                     .loc[
                         im.start_time : im.end_time,
@@ -617,7 +619,7 @@ def create_exogeneous_transformers(
                     .to_numpy()
                 )
             elif t["fuel"] in ["natgas", "hardcoal", "lignite"]:
-                outflow_args_el["min"] = (
+                outflow_args_el["min"] *= (
                     input_data["transformers_minload_ts"]
                     .loc[
                         im.start_time : im.end_time,
@@ -626,7 +628,7 @@ def create_exogeneous_transformers(
                     .to_numpy()
                 )
             else:
-                outflow_args_el["min"] = (
+                outflow_args_el["min"] *= (
                     input_data["transformers_minload_ts"]
                     .loc[
                         im.start_time : im.end_time,
@@ -637,7 +639,7 @@ def create_exogeneous_transformers(
 
         if t["type"] == "ipp":
             if t["identifier"] in input_data["min_loads_ipp"].columns:
-                outflow_args_el["min"] = (
+                outflow_args_el["min"] *= (
                     input_data["min_loads_ipp"]
                     .loc[
                         im.start_time : im.end_time,
@@ -646,7 +648,7 @@ def create_exogeneous_transformers(
                     .to_numpy()
                 )
             else:
-                outflow_args_el["min"] = (
+                outflow_args_el["min"] *= (
                     input_data["transformers_minload_ts"]
                     .loc[
                         im.start_time : im.end_time,
@@ -727,9 +729,11 @@ def create_new_built_transformers(
         if im.multi_period:
             invest_max = annual_invest_limit
             invest_kwargs["maximum"] = invest_max
-            invest_kwargs["ep_costs"] = input_data["investment_costs"].loc[
-                t["technology"], im.startyear
-            ]
+            invest_kwargs["ep_costs"] = np.array(
+                input_data["investment_costs"].loc[
+                    t["technology"], im.startyear : im.endyear
+                ]
+            )
             multi_period_invest_kwargs = {
                 "lifetime": t["lifetime"],
                 "age": 0,
@@ -892,24 +896,26 @@ def create_exogenous_storages(input_data, im, node_dict):
     """
     for i, s in input_data["storages_el"].iterrows():
 
-        existing_storage_capacity = input_data[
-            "existing_storages_capacities"
-        ].at[i + "_capacity", im.start_year]
-        existing_turbine_capacity = input_data[
-            "existing_storages_capacities"
-        ].at[i + "_turbine", im.start_year]
+        minimum = {}
+        maximum = {}
+        for key in ["capacity", "pump", "turbine"]:
+            minimum[key] = (
+                input_data["min_max_timeseries"].loc[
+                    im.starttime : im.endtime, (f"i_{key}", "min")
+                ]
+            ).to_numpy()
+            maximum[key] = (
+                input_data["min_max_timeseries"].loc[
+                    im.starttime : im.endtime, (f"i_{key}", "max")
+                ]
+            ).to_numpy()
 
         if s["type"] == "phes":
-            existing_pump_capacity = input_data[
-                "existing_storages_capacities"
-            ].at[i + "_pump", im.start_year]
-
             node_dict[i] = solph.components.GenericStorage(
                 label=i,
                 inputs={
                     node_dict[s["bus_inflow"]]: solph.flows.Flow(
-                        nominal_value=s["capacity_pump"]
-                        * existing_pump_capacity,
+                        nominal_value=s["capacity_pump_max"],
                         variable_costs=(
                             input_data["costs_operation_storages_ts"].loc[
                                 i, 2020
@@ -918,26 +924,28 @@ def create_exogenous_storages(input_data, im, node_dict):
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
+                        min=minimum["pump"],
+                        max=maximum["pump"],
                     )
                 },
                 outputs={
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
-                        nominal_value=s["capacity_turbine"]
-                        * existing_turbine_capacity,
+                        nominal_value=s["capacity_turbine_max"],
                         variable_costs=(
                             input_data["costs_operation_storages"].loc[i, 2020]
                             * input_data["costs_operation_storages"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
+                        min=minimum["turbine"],
+                        max=maximum["turbine"],
                     )
                 },
-                nominal_storage_capacity=s["nominal_storable_energy"]
-                * existing_storage_capacity,
+                nominal_storage_capacity=s["nominal_storable_energy_max"],
                 loss_rate=s["loss_rate"],
                 initial_storage_level=s["initial_storage_level"],
-                max_storage_level=s["max_storage_level"],
-                min_storage_level=s["min_storage_level"],
+                max_storage_level=s["max_storage_level"] * maximum["capacity"],
+                min_storage_level=s["min_storage_level"] * maximum["capacity"],
                 inflow_conversion_factor=s["efficiency_pump"],
                 outflow_conversion_factor=s["efficiency_turbine"],
                 balanced=True,
@@ -949,24 +957,22 @@ def create_exogenous_storages(input_data, im, node_dict):
                 inputs={node_dict[s["bus_inflow"]]: solph.flows.Flow()},
                 outputs={
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
-                        nominal_value=s["capacity_turbine"]
-                        * existing_turbine_capacity,
+                        nominal_value=s["capacity_turbine"],
                         variable_costs=(
                             input_data["costs_operation_storages"].loc[i, 2020]
                             * input_data["costs_operation_storages"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
-                        min=s["min_load_factor"],
-                        max=s["max_load_factor"],
+                        min=s["min_load_factor"] * minimum["turbine"],
+                        max=s["max_load_factor"] * maximum["turbine"],
                     )
                 },
-                nominal_storage_capacity=s["nominal_storable_energy"]
-                * existing_storage_capacity,
+                nominal_storage_capacity=s["nominal_storable_energy"],
                 loss_rate=s["loss_rate"],
                 initial_storage_level=s["initial_storage_level"],
-                max_storage_level=s["max_storage_level"],
-                min_storage_level=s["min_storage_level"],
+                max_storage_level=s["max_storage_level"] * maximum["capacity"],
+                min_storage_level=s["min_storage_level"] * maximum["capacity"],
                 inflow_conversion_factor=s["efficiency_pump"],
                 outflow_conversion_factor=s["efficiency_turbine"],
                 balanced=True,
@@ -1020,48 +1026,52 @@ def create_exogenous_storages_myopic_horizon(
         else:
             initial_storage_level_last_iteration = s["initial_storage_level"]
 
-        existing_storage_capacity = input_data[
-            "existing_storages_capacities"
-        ].at[i + "_capacity", im.start_year]
-        existing_turbine_capacity = input_data[
-            "existing_storages_capacities"
-        ].at[i + "_turbine", im.start_year]
+        minimum = {}
+        maximum = {}
+        for key in ["capacity", "pump", "turbine"]:
+            minimum[key] = (
+                input_data["min_max_timeseries"].loc[
+                    im.starttime : im.endtime, (f"i_{key}", "min")
+                ]
+            ).to_numpy()
+            maximum[key] = (
+                input_data["min_max_timeseries"].loc[
+                    im.starttime : im.endtime, (f"i_{key}", "max")
+                ]
+            ).to_numpy()
 
         if s["type"] == "phes":
-            existing_pump_capacity = input_data[
-                "existing_storages_capacities"
-            ].at[i + "_pump", im.start_year]
-
             node_dict[i] = solph.components.GenericStorage(
                 label=i,
                 inputs={
                     node_dict[s["bus_inflow"]]: solph.flows.Flow(
-                        nominal_value=s["capacity_pump"]
-                        * existing_pump_capacity,
+                        nominal_value=s["capacity_pump"],
                         variable_costs=(
                             input_data["costs_operation_storages"].loc[
                                 i, im.year
                             ]
                         ),
+                        min=minimum["pump"],
+                        max=maximum["pump"],
                     )
                 },
                 outputs={
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
-                        nominal_value=s["capacity_turbine"]
-                        * existing_turbine_capacity,
+                        nominal_value=s["capacity_turbine"],
                         variable_costs=(
                             input_data["costs_operation_storages"].loc[
                                 i, im.year
                             ]
                         ),
+                        min=minimum["turbine"],
+                        max=maximum["turbine"],
                     )
                 },
-                nominal_storage_capacity=s["nominal_storable_energy"]
-                * existing_storage_capacity,
+                nominal_storage_capacity=s["nominal_storable_energy"],
                 loss_rate=s["loss_rate"],
                 initial_storage_level=initial_storage_level_last_iteration,
-                max_storage_level=s["max_storage_level"],
-                min_storage_level=s["min_storage_level"],
+                max_storage_level=s["max_storage_level"] * maximum["turbine"],
+                min_storage_level=s["min_storage_level"] * minimum["turbine"],
                 inflow_conversion_factor=s["efficiency_pump"],
                 outflow_conversion_factor=s["efficiency_turbine"],
                 balanced=True,
@@ -1073,23 +1083,21 @@ def create_exogenous_storages_myopic_horizon(
                 inputs={node_dict[s["bus_inflow"]]: solph.flows.Flow()},
                 outputs={
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
-                        nominal_value=s["capacity_turbine"]
-                        * existing_pump_capacity,
+                        nominal_value=s["capacity_turbine"],
                         variable_costs=(
                             input_data["costs_operation_storages"].loc[
                                 i, im.year
                             ]
                         ),
-                        min=s["min_load_factor"],
-                        max=s["max_load_factor"],
+                        min=s["min_load_factor"] * minimum["turbine"],
+                        max=s["max_load_factor"] * maximum["turbine"],
                     )
                 },
-                nominal_storage_capacity=s["nominal_storable_energy"]
-                * existing_storage_capacity,
+                nominal_storage_capacity=s["nominal_storable_energy"],
                 loss_rate=s["loss_rate"],
                 initial_storage_level=initial_storage_level_last_iteration,
-                max_storage_level=s["max_storage_level"],
-                min_storage_level=s["min_storage_level"],
+                max_storage_level=s["max_storage_level"] * maximum["capacity"],
+                min_storage_level=s["min_storage_level"] * minimum["capacity"],
                 inflow_conversion_factor=s["efficiency_pump"],
                 outflow_conversion_factor=s["efficiency_turbine"],
                 balanced=True,
@@ -1205,17 +1213,19 @@ def create_new_built_storages(input_data, im, node_dict):
 
             invest_kwargs["inflow"]["ep_costs"] = (
                 input_data["storage_pump_investment_costs"].loc[
-                    i, im.startyear
+                    i, im.startyear : im.endyear
                 ],
-            )
+            ).to_numpy()
             invest_kwargs["ouflow"]["ep_costs"] = (
                 input_data["storage_turbine_investment_costs"].loc[
-                    i, im.startyear
+                    i, im.startyear : im.endyear
                 ],
-            )
+            ).to_numpy()
             invest_kwargs["capacity"]["ep_costs"] = (
-                input_data["storage_investment_costs"].loc[i, im.startyear],
-            )
+                input_data["storage_investment_costs"].loc[
+                    i, im.startyear : im.endyear
+                ],
+            ).to_numpy()
 
             multi_period_invest_kwargs = {
                 "inflow": {
