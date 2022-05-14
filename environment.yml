@@ -1,14 +1,11 @@
 name: pommesinvest
 channels:
-  - anaconda
   - conda-forge
-  - defaults
 dependencies:
   - python=3.8
   - pip
   - numpy
   - pandas
   - pip:
-    # TODO: Replace with release when available
-    - git+https://github.com/oemof/oemof-solph.git@features/multi-period
-
+      # TODO: Replace with release when available
+      - git+https://github.com/oemof/oemof-solph.git@features/multi-period

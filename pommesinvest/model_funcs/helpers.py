@@ -11,23 +11,29 @@ Python version >= 3.8
 @author: Johannes Kochems
 """
 
-# Import necessary packages for function definitions
-import pandas as pd
 import math
-
-from pommesinvest.model_funcs.model_control import FREQUENCY_TO_TIMESTEPS
-
-# Import datetime for conversion between date string and its element (year, month, ...)
 from datetime import datetime
+from itertools import compress
+
+import pandas as pd
 from dateutil.relativedelta import relativedelta
 from pandas.tseries.frequencies import to_offset
 
-from itertools import compress
+# Consider idealistic years, ignoring leap years and weekdays
+FREQUENCY_TO_TIMESTEPS = {
+    "60min": {"timesteps": 8760, "multiplier": 1},
+    "4H": {"timesteps": 2190, "multiplier": 4},
+    "8H": {"timesteps": 1095, "multiplier": 8},
+    "24H": {"timesteps": 365, "multiplier": 24},
+    "36H": {"timesteps": 244, "multiplier": 36},
+    "48H": {"timesteps": 182, "multiplier": 48},
+}
 
 
 def years_between(y1, y2):
 
-    """Calculate the difference in years between two dates using the dateutil.relativedelta package
+    """Calculate the difference in years between two dates using
+    the dateutil.relativedelta package
 
     Parameters:
     ----------
@@ -79,7 +85,7 @@ def time_steps_between_timestamps(ts1, ts2, freq):
     )
 
     return math.floor(
-        diff_in_hours / FREQUENCY_TO_TIMESTEPS[freq]["multiplicator"]
+        diff_in_hours / FREQUENCY_TO_TIMESTEPS[freq]["multiplier"]
     )
 
 

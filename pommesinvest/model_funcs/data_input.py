@@ -17,25 +17,24 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 """
 
 import pandas as pd
-
+from pommesinvest.model_funcs import helpers
 from pommesinvest.model_funcs.subroutines import (
-    load_input_data,
     create_buses,
     create_commodity_sources,
-    create_shortage_sources,
-    create_renewables,
-    create_demand_response_units,
     create_demand,
+    create_demand_response_units,
     create_excess_sinks,
-    create_exogenous_transformers,
-    create_new_built_transformers,
-    create_new_built_transformers_myopic_horizon,
     create_exogenous_storages,
     create_exogenous_storages_myopic_horizon,
+    create_exogenous_transformers,
     create_new_built_storages,
     create_new_built_storages_myopic_horizon,
+    create_new_built_transformers,
+    create_new_built_transformers_myopic_horizon,
+    create_renewables,
+    create_shortage_sources,
+    load_input_data,
 )
-from pommesinvest.model_funcs import helpers
 
 
 def parse_input_data(im):
@@ -62,26 +61,32 @@ def parse_input_data(im):
         "sources_shortage": "sources_shortage",
         "sources_commodity": "sources_commodity",
         "sources_renewables": "sources_renewables",
-        "storages_el": "storages_el",
-        "exogenous_transformers": "transformers",
+        "exogenous_storages_el": "exogenous_storages_el",
+        "new_built_storages_el": "new_built_storages_el",
+        "exogenous_transformers": "exogenous_transformers",
         "new_built_transformers": "new_built_transformers",
     }
 
     time_series = {
         "sinks_demand_el_ts": "sinks_demand_el_ts",
         "sources_renewables_ts": "sources_renewables_ts",
+        "sources_renewables_capacities_ts": "sources_renewables_capacities_ts",
         "transformers_minload_ts": "transformers_minload_ts",
         "transformers_availability_ts": "transformers_availability_ts",
-        "exogenous_transformer_capacities": "transformer_capacities",
-        "exogenous_storages_capacities": "storages_capacities",
         "costs_fuel": f"costs_fuel_{im.fuel_cost_pathway}_nominal",
-        "costs_fuel_ts": "costs_fuel_ts",
+        "costs_fuel_ts": (
+            f"costs_fuel_{im.fuel_cost_pathway}_nominal_indexed_ts"
+        ),
         "costs_emissions": (
             f"costs_emissions_{im.emissions_cost_pathway}_nominal"
         ),
-        "costs_emissions_ts": "costs_emissions_ts",
+        "costs_emissions_ts": (
+            f"costs_emissions_{im.emissions_cost_pathway}_nominal_indexed_ts"  # noqa: E501
+        ),
         "costs_operation": "costs_operation_nominal",
+        "costs_operation_ts": "costs_operation_nominal_indexed_ts",
         "costs_operation_storages": "costs_operation_storages_nominal",
+        "costs_operation_storages_ts": "costs_operation_storages_nominal_indexed_ts",
         "costs_investment": (
             f"costs_investment_{im.investment_cost_pathway}_nominal"
         ),
@@ -125,6 +130,10 @@ def parse_input_data(im):
     input_files = {**buses, **components, **time_series}
     input_files = {**input_files, **other_files}
 
+    input_files = {
+        k: v + "_2020" for k, v in input_files.items()
+    }
+
     return {
         key: load_input_data(filename=name, im=im)
         for key, name in input_files.items()
@@ -143,16 +152,15 @@ def resample_input_data(input_data, im):
     im : :class:`InvestmentModel`
         The investment model that is considered
     """
-    transformer_data = ["existing_transformers", "new_built_transformers"]
-    storage_data = ["storages_el", "new_built_storages_el"]
+    transformer_data = ["exogenous_transformers", "new_built_transformers"]
+    storage_data = ["exogenous_storages_el", "new_built_storages_el"]
     annual_ts = [
+        "sources_renewables_capacities_ts",
         "min_max_ts",
-        "exogenous_transformer_capacities",
-        "exogenous_storages_capacities",
-        "costs_fuel",
-        "costs_emissions",
-        "costs_operation",
-        "costs_operation_storages",
+        "costs_fuel_ts",
+        "costs_emissions_ts",
+        "costs_operation_ts",
+        "costs_operation_storages_ts",
     ]
     hourly_ts = [
         "transformers_availability_ts",
@@ -181,7 +189,7 @@ def resample_input_data(input_data, im):
                         "min_load_factor",
                     ],
                 ]
-                .mul(im.multiplicator)
+                .mul(im.multiplier)
             )
         elif key in storage_data:
             input_data[key] = input_data[key].where(
@@ -204,9 +212,10 @@ def resample_input_data(input_data, im):
                         "nominal_storable_energy",
                     ],
                 ]
-                .mul(im.multiplicator)
+                .mul(im.multiplier)
             )
         elif key in annual_ts:
+            input_data[key].loc["2051-01-01"] = input_data[key].loc["2050-01-01"]
             input_data[key] = (
                 helpers.resample_timeseries(
                     input_data[key], freq=im.freq, interpolation_rule="linear"
@@ -351,7 +360,7 @@ def nodes_from_csv_myopic_horizon(im, iteration_results):
     """
     frequency_used = (
         (
-            getattr(im, "time_slice_length_with_overlap") * im.multiplicator,
+            getattr(im, "time_slice_length_with_overlap") * im.multiplier,
             "h",
         ),
     )

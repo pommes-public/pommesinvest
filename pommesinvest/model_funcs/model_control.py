@@ -19,7 +19,9 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 import logging
 import math
 
-from oemof.solph import constraints, views, models, network, processing
+import oemof.solph as solph
+
+# constraints, views, models, network, processing
 from oemof.tools import logger
 
 from pommesinvest.model_funcs import helpers
@@ -29,17 +31,6 @@ from pommesinvest.model_funcs.data_input import (
 )
 
 import pandas as pd
-
-
-# Consider idealistic years, ignoring leap years and weekdays
-FREQUENCY_TO_TIMESTEPS = {
-    "60min": {"timesteps": 8760, "multiplicator": 1},
-    "4H": {"timesteps": 2190, "multiplicator": 4},
-    "8H": {"timesteps": 1095, "multiplicator": 8},
-    "24H": {"timesteps": 365, "multiplicator": 24},
-    "36H": {"timesteps": 244, "multiplicator": 36},
-    "48H": {"timesteps": 182, "multiplicator": 48},
-}
 
 
 def show_meta_logging_info(model_meta):
@@ -212,7 +203,10 @@ class InvestmentModel(object):
     freq : str
         Frequency of the simulation, i.e. freqeuncy of the pandas.date_range
         object
-
+    
+    multiplier : int
+        multiplier to transform parameters defined for hourly frequency
+    
     path_folder_input : str
         The path to the folder where the input data is stored
 
@@ -236,6 +230,7 @@ class InvestmentModel(object):
         self.myopic_horizon = None
         self.aggregate_input = None
         self.interest_rate = None
+        self.countries = None
         self.solver = None
         self.fuel_cost_pathway = None
         self.emissions_cost_pathway = None
@@ -251,6 +246,7 @@ class InvestmentModel(object):
         self.start_time = None
         self.end_time = None
         self.freq = None
+        self.multiplier = None
         self.path_folder_input = None
         self.path_folder_output = None
         self.om = None
@@ -280,7 +276,7 @@ class InvestmentModel(object):
                         )
                 setattr(self, k, v)
                 if k == "freq":
-                    self.set_multiplicator()
+                    self.set_multiplier()
 
         if hasattr(self, "start_time"):
             setattr(
@@ -289,9 +285,9 @@ class InvestmentModel(object):
         if hasattr(self, "end_time"):
             setattr(self, "end_year", str(pd.to_datetime(self.end_time).year))
 
-    def set_multiplicator(self):
-        """Set multiplicator and timesteps dependent on frequency attribute"""
-        self.multiplicator = FREQUENCY_TO_TIMESTEPS[self.freq]["multiplicator"]
+    def set_multiplier(self):
+        """Set multiplier and timesteps dependent on frequency attribute"""
+        self.multiplier = helpers.FREQUENCY_TO_TIMESTEPS[self.freq]["multiplier"]
 
     def check_model_configuration(self):
         """Checks if any necessary model parameter hasn't been set yet"""
@@ -348,7 +344,7 @@ class InvestmentModel(object):
             self,
             "time_slice_length_wo_overlap_in_time_steps",
             (
-                FREQUENCY_TO_TIMESTEPS[self.freq]["timesteps"]
+                helpers.FREQUENCY_TO_TIMESTEPS[self.freq]["timesteps"]
                 * getattr(self, "myopic_horizon_in_years")
             ),
         )
@@ -356,7 +352,7 @@ class InvestmentModel(object):
             self,
             "overlap_in_time_steps",
             (
-                FREQUENCY_TO_TIMESTEPS[self.freq]["timesteps"]
+                helpers.FREQUENCY_TO_TIMESTEPS[self.freq]["timesteps"]
                 * getattr(self, "overlap_in_years")
             ),
         )
@@ -453,11 +449,11 @@ class InvestmentModel(object):
             self.start_time, self.end_time, freq=self.freq
         )
         if self.multi_period:
-            es = network.EnergySystem(
+            es = solph.EnergySystem(
                 timeindex=datetime_index, multi_period=True
             )
         else:
-            es = network.EnergySystem(timeindex=datetime_index)
+            es = solph.EnergySystem(timeindex=datetime_index)
 
         nodes_dict, emissions_limit = nodes_from_csv(self)
 
@@ -466,7 +462,7 @@ class InvestmentModel(object):
         )
 
         es.add(*nodes_dict.values())
-        setattr(self, "om", models.Model(es))
+        setattr(self, "om", solph.Model(es))
 
         self.add_further_constrs(emissions_limit)
 
@@ -520,7 +516,7 @@ class InvestmentModel(object):
                 emission_flows[(i, o)] = self.om.flows[(i, o)]
 
         if self.activate_emissions_limit:
-            constraints.emission_limit(
+            solph.constraints.emission_limit(
                 self.om, flows=emission_flows, limit=emissions_limit
             )
             logging.info(
@@ -546,7 +542,8 @@ class InvestmentModel(object):
         """
         if self.multi_period:
             msg = (
-                "A model cannot be a myopic horizon model and a multi-period model at once.\n"
+                "A model cannot be a myopic horizon model "
+                "and a multi-period model at once.\n"
                 "Please choose one of both in the configuration and rerun."
             )
             raise ValueError(msg)
@@ -566,14 +563,14 @@ class InvestmentModel(object):
             periods=getattr(self, "time_slice_length_with_overlap"),
             freq=self.freq,
         )
-        es = network.EnergySystem(timeindex=datetime_index)
+        es = solph.EnergySystem(timeindex=datetime_index)
 
         (
             node_dict,
             emissions_limit,
             transformer_and_storage_labels,
         ) = nodes_from_csv_myopic_horizon(self, iteration_results)
-        # Only set storage and transformer labels attribute for the 0th iteration
+        # Only set storage and transformer labels attribute for 0th iteration
         if not hasattr(self, "transformer_and_storage_labels"):
             setattr(
                 self,
@@ -589,7 +586,7 @@ class InvestmentModel(object):
             f"Successfully set up energy system for iteration {counter}"
         )
 
-        self.om = models.Model(es)
+        self.om = solph.Model(es)
 
         self.add_further_constrs(emissions_limit)
 
@@ -634,8 +631,8 @@ class InvestmentModel(object):
         print("********************************************************")
         logging.info(f"Model run {counter} done!")
 
-        iter_results["model_results"] = processing.results(self.om)
-        electricity_bus = views.node(
+        iter_results["model_results"] = solph.processing.results(self.om)
+        electricity_bus = solph.views.node(
             iter_results["model_results"], "DE_bus_el"
         )
         sliced_dispatch_results = pd.DataFrame(
@@ -651,7 +648,7 @@ class InvestmentModel(object):
             "dispatch_results"
         ].append(iteration_investments, axis=1)
 
-        meta_results = processing.meta_results(self.om)
+        meta_results = solph.processing.meta_results(self.om)
         # Objective is weighted in order to take overlap into account
         model_meta["overall_objective"] += int(
             meta_results["objective"]
@@ -682,7 +679,9 @@ class InvestmentModel(object):
             )
 
         for i, s in iteration_results["new_built_tansformers"].iterrows():
-            transformer = views.node(iteration_results["model_results"], i)
+            transformer = solph.views.node(
+                iteration_results["model_results"], i
+            )
 
             # Increase capacity by results of each iteration
             iteration_results["new_built_tansformers"].at[
@@ -698,7 +697,7 @@ class InvestmentModel(object):
             )
 
         for i, s in iteration_results["storages_exogenous"].iterrows():
-            storage = views.node(iteration_results["model_results"], i)
+            storage = solph.views.node(iteration_results["model_results"], i)
 
             iteration_results["storages_existing"].at[
                 i, "initial_storage_level_last_iteration"
@@ -721,7 +720,7 @@ class InvestmentModel(object):
             )
 
         for i, s in iteration_results["storages_new_built"].iterrows():
-            storage = views.node(iteration_results["model_results"], i)
+            storage = solph.views.node(iteration_results["model_results"], i)
 
             iteration_results["storages_new_built"].at[
                 i, "initial_storage_level_last_iteration"
