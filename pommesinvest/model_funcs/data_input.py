@@ -60,17 +60,16 @@ def parse_input_data(im):
         "sinks_demand_el": "sinks_demand_el",
         "sources_shortage": "sources_shortage",
         "sources_commodity": "sources_commodity",
-        "sources_renewables": "sources_renewables",
-        "exogenous_storages_el": "exogenous_storages_el",
-        "new_built_storages_el": "new_built_storages_el",
-        "exogenous_transformers": "exogenous_transformers",
-        "new_built_transformers": "new_built_transformers",
+        "sources_renewables": "sources_renewables_investment_model",
+        "exogenous_storages_el": "storages_el_exogenous",
+        "new_built_storages_el": "storages_el_investment_options",
+        "exogenous_transformers": "transformers_exogenous",
+        "new_built_transformers": "transformers_investment_options",
     }
 
     time_series = {
-        "sinks_demand_el_ts": "sinks_demand_el_ts",
-        "sources_renewables_ts": "sources_renewables_ts",
-        "sources_renewables_capacities_ts": "sources_renewables_capacities_ts",
+        "sinks_demand_el_ts": "sinks_demand_el_ts_investment_model",
+        "sources_renewables_ts": "sources_renewables_ts_investment_model",
         "transformers_minload_ts": "transformers_minload_ts",
         "transformers_availability_ts": "transformers_availability_ts",
         "costs_fuel": f"costs_fuel_{im.fuel_cost_pathway}_nominal",
@@ -81,12 +80,14 @@ def parse_input_data(im):
             f"costs_emissions_{im.emissions_cost_pathway}_nominal"
         ),
         "costs_emissions_ts": (
-            f"costs_emissions_{im.emissions_cost_pathway}_nominal_indexed_ts"  # noqa: E501
+            f"costs_emissions_{im.emissions_cost_pathway}_nominal_indexed_ts"
         ),
         "costs_operation": "costs_operation_nominal",
         "costs_operation_ts": "costs_operation_nominal_indexed_ts",
         "costs_operation_storages": "costs_operation_storages_nominal",
-        "costs_operation_storages_ts": "costs_operation_storages_nominal_indexed_ts",
+        "costs_operation_storages_ts": (
+            "costs_operation_storages_nominal_indexed_ts"
+        ),
         "costs_investment": (
             f"costs_investment_{im.investment_cost_pathway}_nominal"
         ),
@@ -102,10 +103,6 @@ def parse_input_data(im):
     other_files = {
         "emission_limits": "emission_limits",
     }
-
-    # Optionally use aggregated transformer data instead
-    if im.aggregate_input:
-        components["transformers"] = "transformers_clustered"
 
     # Add demand response units
     if im.activate_demand_response:
@@ -130,9 +127,9 @@ def parse_input_data(im):
     input_files = {**buses, **components, **time_series}
     input_files = {**input_files, **other_files}
 
-    input_files = {
-        k: v + "_2020" for k, v in input_files.items()
-    }
+    # input_files = {
+    #     k: v + "_2020" for k, v in input_files.items()
+    # }
 
     return {
         key: load_input_data(filename=name, im=im)

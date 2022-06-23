@@ -50,7 +50,7 @@ def load_input_data(filename=None, im=None):
     if "_ts" not in filename:
         df = pd.read_csv(im.path_folder_input + filename + ".csv", index_col=0)
     else:
-        df = load_time_series_data_slice(filename, im)
+        df = load_time_series_data_slice(filename + ".csv", im)
 
     if "country" in df.columns and im.countries is not None:
         df = df[df["country"].isin(im.countries)]
@@ -89,11 +89,11 @@ def load_time_series_data_slice(filename=None, im=None):
         index_col=0,
         usecols=[0],
     )
-    start_index = pd.Index(ts_start.index).get_loc(im.starttime)
-    timeseries_end = pd.Timestamp(im.endtime, im.freq)
+    start_index = pd.Index(ts_start.index).get_loc(im.start_time)
+    timeseries_end = pd.Timestamp(im.end_time, im.freq)
     end_index = pd.Index(ts_start.index).get_loc(
         (
-            timeseries_end + im.overlap_in_timesteps * timeseries_end.freq
+            timeseries_end + im.overlap_in_time_steps * timeseries_end.freq
         ).strftime("%Y-%m-%d %H:%M:%S")
     )
 
@@ -242,11 +242,8 @@ def create_renewables(input_data, im, node_dict):
                     node_dict[re["to"]]: solph.flows.Flow(
                         fix=np.array(
                             input_data["sources_renewables_ts"][i][
-                                im.start_time : im.end_time
+                                im.start_time:im.end_time
                             ]
-                            * input_data["sources_renewables_capacities_ts"][
-                                i
-                            ][im.start_time : im.end_time]
                         ),
                         nominal_value=re["capacity_max"],
                     )

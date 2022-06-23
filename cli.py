@@ -7,7 +7,6 @@ def create_default_config():
 # 1) Set overall workflow control parameters
 control_parameters:
     rolling_horizon: False
-    aggregate_input: False
     countries: ['AT', 'BE', 'CH', 'CZ', 'DE', 'DK1', 'DK2', 'FR', 'NL',
                 'NO1', 'NO2', 'NO3', 'NO4', 'NO5', 'PL',
                 'SE1', 'SE2', 'SE3', 'SE4']

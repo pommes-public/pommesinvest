@@ -60,10 +60,6 @@ class InvestmentModel(object):
         parameters `time_slice_length_wo_overlap_in_hours` and
         `overlap_in_hours` (both of type int) have to be defined.
 
-    aggregate_input : boolean
-        boolean control variable indicating whether to use complete
-        or aggregated transformer input data set
-
     interest_rate : float
         Interest rate used for discounting
 
@@ -220,15 +216,15 @@ class InvestmentModel(object):
         The length of a time slice for a myopic horizon model run in hours,
         not including an overlap
 
-    overlap_in_hours : int (optional, for myopic horizon)
-        The length of the overlap for a myopic horizon model run in hours
+    overlap_in_time_steps : int (optional, for myopic horizon)
+        The length of the overlap for a myopic horizon model run in hours;
+        defaults to 0 for a regular, i.e. non-myopic model
     """  # noqa: E501
 
     def __init__(self):
         """Initialize an empty InvestmentModel object"""
         self.multi_period = None
         self.myopic_horizon = None
-        self.aggregate_input = None
         self.interest_rate = None
         self.countries = None
         self.solver = None
@@ -250,6 +246,7 @@ class InvestmentModel(object):
         self.path_folder_input = None
         self.path_folder_output = None
         self.om = None
+        self.overlap_in_time_steps = 0
 
     def update_model_configuration(self, *model_parameters, nolog=False):
         """Set the main model parameters by extracting them from dicts
@@ -392,19 +389,14 @@ class InvestmentModel(object):
             rh = "simple_"
         else:
             rh = "RH_"
-        if self.aggregate_input:
-            agg = "clustered"
-        else:
-            agg = "complete"
 
         filename = (
-            "dispatch_LP_start-"
+            "investment_LP_start-"
             + self.start_time[:10]
             + "_"
             + str(optimization_timeframe)
             + "-years_"
             + rh
-            + agg
         )
 
         setattr(self, "filename", filename)
@@ -414,11 +406,6 @@ class InvestmentModel(object):
 
     def show_configuration_log(self):
         """Show some logging info dependent on model configuration"""
-        if self.aggregate_input:
-            agg_string = "Using the AGGREGATED POWER PLANT DATA SET"
-        else:
-            agg_string = "Using the COMPLETE POWER PLANT DATA SET."
-
         if self.activate_demand_response:
             dr_string = (
                 f"Using approach '{self.demand_response_approach}' "
@@ -429,10 +416,9 @@ class InvestmentModel(object):
         else:
             dr_string = "Running a model WITHOUT DEMAND RESPONSE"
 
-        logging.info(agg_string)
         logging.info(dr_string)
 
-        return agg_string, dr_string
+        return dr_string
 
     def build_simple_model(self):
         r"""Set up and return a simple model
