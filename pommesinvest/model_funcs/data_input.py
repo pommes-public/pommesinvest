@@ -67,24 +67,24 @@ def parse_input_data(im):
         "new_built_transformers": "transformers_investment_options",
     }
 
-    time_series = {
+    hourly_time_series = {
         "sinks_demand_el_ts": "sinks_demand_el_ts_investment_model",
         "sources_renewables_ts": "sources_renewables_ts_investment_model",
         "transformers_minload_ts": "transformers_minload_ts",
         "transformers_availability_ts": "transformers_availability_ts",
-        "costs_fuel": f"costs_fuel_{im.fuel_cost_pathway}_nominal",
+        "min_loads_dh": "min_loads_dh",
+        "min_loads_ipp": "min_loads_ipp",
+        "min_max_ts": "min_max_ts",
+    }
+
+    annual_time_series = {
         "costs_fuel_ts": (
             f"costs_fuel_{im.fuel_cost_pathway}_nominal_indexed_ts"
-        ),
-        "costs_emissions": (
-            f"costs_emissions_{im.emissions_cost_pathway}_nominal"
         ),
         "costs_emissions_ts": (
             f"costs_emissions_{im.emissions_cost_pathway}_nominal_indexed_ts"
         ),
-        "costs_operation": "costs_operation_nominal",
         "costs_operation_ts": "costs_operation_nominal_indexed_ts",
-        "costs_operation_storages": "costs_operation_storages_nominal",
         "costs_operation_storages_ts": (
             "costs_operation_storages_nominal_indexed_ts"
         ),
@@ -95,9 +95,6 @@ def parse_input_data(im):
             f"costs_storages_investment_{im.investment_cost_pathway}_nominal"
         ),
         "wacc": "wacc",
-        "min_loads_dh": "min_loads_dh",
-        "min_loads_ipp": "min_loads_ipp",
-        "min_max_ts": "min_max_ts",
     }
 
     other_files = {
@@ -124,7 +121,12 @@ def parse_input_data(im):
         )
 
     # Combine all files
-    input_files = {**buses, **components, **time_series}
+    input_files = {
+        **buses,
+        **components,
+        **annual_time_series,
+        **hourly_time_series,
+    }
     input_files = {**input_files, **other_files}
 
     # input_files = {
@@ -212,7 +214,9 @@ def resample_input_data(input_data, im):
                 .mul(im.multiplier)
             )
         elif key in annual_ts:
-            input_data[key].loc["2051-01-01"] = input_data[key].loc["2050-01-01"]
+            input_data[key].loc["2051-01-01"] = input_data[key].loc[
+                "2050-01-01"
+            ]
             input_data[key] = (
                 helpers.resample_timeseries(
                     input_data[key], freq=im.freq, interpolation_rule="linear"

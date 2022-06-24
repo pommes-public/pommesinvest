@@ -46,9 +46,9 @@ def load_input_data(filename=None, im=None):
     df : :class:`pandas.DataFrame`
         DataFrame containing information about nodes or time series.
     """
-    df = pd.DataFrame()
-    if "_ts" not in filename:
+    if "_ts" not in filename or "nominal" in filename:
         df = pd.read_csv(im.path_folder_input + filename + ".csv", index_col=0)
+    # Load slices for hourly data to reduce computational overhead
     else:
         df = load_time_series_data_slice(filename + ".csv", im)
 
@@ -83,17 +83,19 @@ def load_time_series_data_slice(filename=None, im=None):
     df : :class:`pandas.DataFrame`
         DataFrame containing sliced time series.
     """
-    ts_start = pd.read_csv(
+    time_series_start = pd.read_csv(
         im.path_folder_input + filename,
         parse_dates=True,
         index_col=0,
         usecols=[0],
     )
-    start_index = pd.Index(ts_start.index).get_loc(im.start_time)
-    timeseries_end = pd.Timestamp(im.end_time, im.freq)
-    end_index = pd.Index(ts_start.index).get_loc(
+    start_index = pd.Index(time_series_start.index).get_loc(im.start_time)
+    time_series_end = pd.Timestamp(im.end_time)
+    end_index = pd.Index(time_series_start.index).get_loc(
         (
-            timeseries_end + im.overlap_in_time_steps * timeseries_end.freq
+            time_series_end
+            + im.overlap_in_time_steps
+            * pd.Timedelta(hours=int(im.freq.split("H")[0]))
         ).strftime("%Y-%m-%d %H:%M:%S")
     )
 
@@ -159,18 +161,12 @@ def create_commodity_sources(input_data, im, node_dict):
             outputs={
                 node_dict[cs["to"]]: solph.flows.Flow(
                     variable_costs=(
-                        input_data["costs_fuel"].loc[i, 2020]
-                        * np.array(
-                            input_data["costs_fuel_ts"].loc[
-                                im.start_time : im.end_time, i
-                            ]
-                        )
-                        + input_data["costs_emissions"].loc[i, 2020]
-                        * np.array(
-                            input_data["costs_emissions_ts"].loc[
-                                im.start_time : im.end_time, i
-                            ]
-                        )
+                        input_data["costs_fuel_ts"]
+                        .loc[im.start_time : im.end_time, i]
+                        .to_numpy()
+                        + input_data["costs_emissions_ts"]
+                        .loc[im.start_time : im.end_time, i]
+                        .to_numpy()
                         * cs["emission_factors"]
                     ),
                     emission_factor=cs["emission_factors"],
@@ -212,7 +208,6 @@ def create_shortage_sources(input_data, node_dict):
     return node_dict
 
 
-# TODO: Normalize infeed timeseries for RES (2020 = 1.0)
 def create_renewables(input_data, im, node_dict):
     r"""Create renewable sources and add them to the dict of nodes.
 
@@ -242,7 +237,7 @@ def create_renewables(input_data, im, node_dict):
                     node_dict[re["to"]]: solph.flows.Flow(
                         fix=np.array(
                             input_data["sources_renewables_ts"][i][
-                                im.start_time:im.end_time
+                                im.start_time : im.end_time
                             ]
                         ),
                         nominal_value=re["capacity_max"],
@@ -587,14 +582,14 @@ def create_exogenous_transformers(
         ).to_numpy()
 
         outflow_args_el = {
-            # Nominal value is the maximum caacity; actual existing is derived from minimum and maximum
+            # Nominal value is the maximum capacity
+            # Actual existing capacity is derived from max time series
             "nominal_value": t["capacity_max"],
             "variable_costs": (
-                input_data["costs_operation_ts"].loc[
-                    im.starttime : im.endtime, ("operation_costs", t["from"])
-                ]
-                * input_data["costs_operation"].loc[t["from"], 2020]
-            ).to_numpy(),
+                input_data["costs_operation_ts"]
+                .loc[im.starttime : im.endtime, ("operation_costs", t["from"])]
+                .to_numpy()
+            ),
             "min": minimum,
             "max": maximum,
         }
@@ -602,17 +597,8 @@ def create_exogenous_transformers(
         # Assign minimum loads for German CHP and IPP plants
         # TODO: Create aggregated minimum load profiles!
         if t["type"] == "chp":
-            if t["identifier"] in input_data["min_loads_dh"].columns:
-                outflow_args_el["min"] *= (
-                    input_data["min_loads_dh"]
-                    .loc[
-                        im.start_time : im.end_time,
-                        t["identifier"],
-                    ]
-                    .to_numpy()
-                )
-            elif t["fuel"] in ["natgas", "hardcoal", "lignite"]:
-                outflow_args_el["min"] *= (
+            if t["fuel"] in ["natgas", "hardcoal", "lignite"]:
+                outflow_args_el["min"] = (
                     input_data["transformers_minload_ts"]
                     .loc[
                         im.start_time : im.end_time,
@@ -621,7 +607,7 @@ def create_exogenous_transformers(
                     .to_numpy()
                 )
             else:
-                outflow_args_el["min"] *= (
+                outflow_args_el["min"] = (
                     input_data["transformers_minload_ts"]
                     .loc[
                         im.start_time : im.end_time,
@@ -631,24 +617,24 @@ def create_exogenous_transformers(
                 )
 
         if t["type"] == "ipp":
-            if t["identifier"] in input_data["min_loads_ipp"].columns:
-                outflow_args_el["min"] *= (
-                    input_data["min_loads_ipp"]
-                    .loc[
-                        im.start_time : im.end_time,
-                        t["identifier"],
-                    ]
-                    .to_numpy()
-                )
-            else:
-                outflow_args_el["min"] *= (
-                    input_data["transformers_minload_ts"]
-                    .loc[
-                        im.start_time : im.end_time,
-                        "ipp",
-                    ]
-                    .to_numpy()
-                )
+            outflow_args_el["min"] = (
+                input_data["transformers_minload_ts"]
+                .loc[
+                    im.start_time : im.end_time,
+                    "ipp",
+                ]
+                .to_numpy()
+            )
+
+        # Correct minimum load by maximum capacities of particular time
+        outflow_args_el["min"] *= (
+            input_data["transformers_exogenous_max_ts"]
+            .loc[
+                im.start_time : im.end_time,
+                t,
+            ]
+            .to_numpy()
+        )
 
         node_dict[i] = build_condensing_transformer(
             i, t, node_dict, outflow_args_el
@@ -910,8 +896,7 @@ def create_exogenous_storages(input_data, im, node_dict):
                     node_dict[s["bus_inflow"]]: solph.flows.Flow(
                         nominal_value=s["capacity_pump_max"],
                         variable_costs=(
-                            input_data["costs_operation_storages"].loc[i, 2020]
-                            * input_data["costs_operation_storages_ts"].loc[
+                            input_data["costs_operation_storages_ts"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
@@ -923,8 +908,7 @@ def create_exogenous_storages(input_data, im, node_dict):
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
                         nominal_value=s["capacity_turbine_max"],
                         variable_costs=(
-                            input_data["costs_operation_storages"].loc[i, 2020]
-                            * input_data["costs_operation_storages_ts"].loc[
+                            input_data["costs_operation_storages_ts"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
@@ -950,8 +934,7 @@ def create_exogenous_storages(input_data, im, node_dict):
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
                         nominal_value=s["capacity_turbine"],
                         variable_costs=(
-                            input_data["costs_operation_storages"].loc[i, 2020]
-                            * input_data["costs_operation_storages_ts"].loc[
+                            input_data["costs_operation_storages_ts"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
@@ -1038,8 +1021,7 @@ def create_exogenous_storages_myopic_horizon(
                     node_dict[s["bus_inflow"]]: solph.flows.Flow(
                         nominal_value=s["capacity_pump"],
                         variable_costs=(
-                            input_data["costs_operation_storages"].loc[i, 2020]
-                            * input_data["costs_operation_storages_ts"].loc[
+                            input_data["costs_operation_storages_ts"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
@@ -1051,8 +1033,7 @@ def create_exogenous_storages_myopic_horizon(
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
                         nominal_value=s["capacity_turbine"],
                         variable_costs=(
-                            input_data["costs_operation_storages"].loc[i, 2020]
-                            * input_data["costs_operation_storages_ts"].loc[
+                            input_data["costs_operation_storages_ts"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
@@ -1078,8 +1059,7 @@ def create_exogenous_storages_myopic_horizon(
                     node_dict[s["bus_outflow"]]: solph.flows.Flow(
                         nominal_value=s["capacity_turbine"],
                         variable_costs=(
-                            input_data["costs_operation_storages"].loc[i, 2020]
-                            * input_data["costs_operation_storages_ts"].loc[
+                            input_data["costs_operation_storages_ts"].loc[
                                 im.starttime : im.endtime, i
                             ]
                         ).to_numpy(),
@@ -1255,8 +1235,7 @@ def create_new_built_storages(input_data, im, node_dict):
             inputs={
                 node_dict[s["bus"]]: solph.flows.Flow(
                     variable_costs=(
-                        input_data["costs_operation_storages"].loc[i, 2020]
-                        * input_data["costs_operation_storages_ts"].loc[
+                        input_data["costs_operation_storages_ts"].loc[
                             im.starttime : im.endtime, i
                         ]
                     ).to_numpy(),
@@ -1267,8 +1246,7 @@ def create_new_built_storages(input_data, im, node_dict):
             outputs={
                 node_dict[s["bus"]]: solph.flows.Flow(
                     variable_costs=(
-                        input_data["costs_operation_storages"].loc[i, 2020]
-                        * input_data["costs_operation_storages_ts"].loc[
+                        input_data["costs_operation_storages_ts"].loc[
                             im.starttime : im.endtime, i
                         ]
                     ).to_numpy(),
@@ -1398,8 +1376,7 @@ def create_new_built_storages_myopic_horizon(
             inputs={
                 node_dict[s["bus"]]: solph.flows.Flow(
                     variable_costs=(
-                        input_data["costs_operation_storages"].loc[i, 2020]
-                        * input_data["costs_operation_storages_ts"].loc[
+                        input_data["costs_operation_storages_ts"].loc[
                             im.starttime : im.endtime, i
                         ]
                     ).to_numpy(),
@@ -1420,8 +1397,7 @@ def create_new_built_storages_myopic_horizon(
             outputs={
                 node_dict[s["bus"]]: solph.flows.Flow(
                     variable_costs=(
-                        input_data["costs_operation_storages"].loc[i, 2020]
-                        * input_data["costs_operation_storages_ts"].loc[
+                        input_data["costs_operation_storages_ts"].loc[
                             im.starttime : im.endtime, i
                         ]
                     ).to_numpy(),

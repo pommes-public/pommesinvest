@@ -21,7 +21,7 @@ from pandas.tseries.frequencies import to_offset
 
 # Consider idealistic years, ignoring leap years and weekdays
 FREQUENCY_TO_TIMESTEPS = {
-    "60min": {"timesteps": 8760, "multiplier": 1},
+    "1H": {"timesteps": 8760, "multiplier": 1},
     "4H": {"timesteps": 2190, "multiplier": 4},
     "8H": {"timesteps": 1095, "multiplier": 8},
     "24H": {"timesteps": 365, "multiplier": 24},
