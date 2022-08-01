@@ -68,16 +68,14 @@ def parse_input_data(im):
     }
 
     hourly_time_series = {
-        "sinks_demand_el_ts": "sinks_demand_el_ts_investment_model",
-        "sources_renewables_ts": "sources_renewables_ts_investment_model",
-        "transformers_minload_ts": "transformers_minload_ts",
-        "transformers_availability_ts": "transformers_availability_ts",
-        "min_loads_dh": "min_loads_dh",
-        "min_loads_ipp": "min_loads_ipp",
-        "min_max_ts": "min_max_ts",
+        "sinks_demand_el_ts": "sinks_demand_el_ts_hourly",
+        "sources_renewables_ts": "sources_renewables_ts_hourly",
+        "transformers_minload_ts": "transformers_minload_ts_hourly",
+        "transformers_availability_ts": "transformers_availability_ts_hourly",
     }
 
     annual_time_series = {
+        "transformers_exogenous_max_ts": "transformers_exogenous_max_ts",
         "costs_fuel_ts": (
             f"costs_fuel_{im.fuel_cost_pathway}_nominal_indexed_ts"
         ),
@@ -89,16 +87,18 @@ def parse_input_data(im):
             "costs_operation_storages_nominal_indexed_ts"
         ),
         "costs_investment": (
-            f"costs_investment_{im.investment_cost_pathway}_nominal"
+            f"investment_expenses_{im.investment_cost_pathway}%_nominal"
         ),
-        "costs_storages_investment": (
-            f"costs_storages_investment_{im.investment_cost_pathway}_nominal"
+        "costs_storages_investment_capacity": (
+            f"investment_expenses_storages_capacity_{im.investment_cost_pathway}%_nominal"  # noqa: E501
         ),
-        "wacc": "wacc",
+        "costs_storages_investment_power": (
+            f"investment_expenses_storages_power_{im.investment_cost_pathway}%_nominal"  # noqa: E501
+        ),
     }
 
     other_files = {
-        "emission_limits": "emission_limits",
+        "emission_limits": "emission_limits", "wacc": "wacc",
     }
 
     # Add demand response units
@@ -154,12 +154,14 @@ def resample_input_data(input_data, im):
     transformer_data = ["exogenous_transformers", "new_built_transformers"]
     storage_data = ["exogenous_storages_el", "new_built_storages_el"]
     annual_ts = [
-        "sources_renewables_capacities_ts",
-        "min_max_ts",
+        "transformers_exogenous_max_ts",
         "costs_fuel_ts",
         "costs_emissions_ts",
         "costs_operation_ts",
         "costs_operation_storages_ts",
+        "costs_investment",
+        "costs_storages_investment_capacity",
+        "costs_storages_investment_power"
     ]
     hourly_ts = [
         "transformers_availability_ts",
@@ -172,47 +174,41 @@ def resample_input_data(input_data, im):
         "min_loads_ipp",
     ]
 
+    transformer_columns = [
+        "grad_pos",
+        "grad_neg",
+        "max_load_factor",
+        "min_load_factor",
+    ]
+    storages_columns = [
+        "max_storage_level",
+        "min_storage_level",
+        "loss_rate",
+    ]
+    existing_storages_add_columns = [
+        "nominal_storable_energy",
+        "max_load_factor",
+        "min_load_factor",
+    ]
+
     for key in input_data.keys():
         if key in transformer_data:
-            input_data[key].loc[
-                :,
-                ["grad_pos", "grad_neg", "max_load_factor", "min_load_factor"],
-            ] = (
-                input_data[key]
-                .loc[
-                    :,
-                    [
-                        "grad_pos",
-                        "grad_neg",
-                        "max_load_factor",
-                        "min_load_factor",
-                    ],
-                ]
-                .mul(im.multiplier)
+            input_data[key].loc[:, transformer_columns] = (
+                input_data[key].loc[:, transformer_columns].mul(im.multiplier)
             )
         elif key in storage_data:
+            # Add additional columns for existing units and remove later on
+            if not "new_built" in key:
+                storages_columns.extend(existing_storages_add_columns)
             input_data[key] = input_data[key].where(
                 pd.notnull(input_data[key]), None
             )
-            input_data[key].loc[
-                :,
-                [
-                    "max_storage_level",
-                    "min_storage_level",
-                    "nominal_storable_energy",
-                ],
-            ] = (
-                input_data[key]
-                .loc[
-                    :,
-                    [
-                        "max_storage_level",
-                        "min_storage_level",
-                        "nominal_storable_energy",
-                    ],
-                ]
-                .mul(im.multiplier)
+            input_data[key].loc[:, storages_columns] = (
+                input_data[key].loc[:, storages_columns].mul(im.multiplier)
             )
+            if not "new_built" in key:
+                for col in existing_storages_add_columns:
+                    storages_columns.remove(col)
         elif key in annual_ts:
             input_data[key].loc["2051-01-01"] = input_data[key].loc[
                 "2050-01-01"

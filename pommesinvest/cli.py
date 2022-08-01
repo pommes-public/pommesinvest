@@ -13,7 +13,7 @@ control_parameters:
     solver: "gurobi"
     fuel_cost_pathway: "NZE"
     emissions_cost_pathway: "long-term"
-    investment_cost_pathway: "middle"
+    investment_cost_pathway: "50"
     activate_emissions_limit: False
     emissions_pathway: "100_percent_linear"
     activate_demand_response: False

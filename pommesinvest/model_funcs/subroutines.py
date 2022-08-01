@@ -46,7 +46,7 @@ def load_input_data(filename=None, im=None):
     df : :class:`pandas.DataFrame`
         DataFrame containing information about nodes or time series.
     """
-    if "_ts" not in filename or "nominal" in filename:
+    if "ts_hourly" not in filename:
         df = pd.read_csv(im.path_folder_input + filename + ".csv", index_col=0)
     # Load slices for hourly data to reduce computational overhead
     else:
