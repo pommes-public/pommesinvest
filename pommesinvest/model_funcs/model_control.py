@@ -91,7 +91,18 @@ class InvestmentModel(object):
             "regression", "| Linear regression based on historic
             | commodity prices from 1991-2020", "| compared to IEA's scenarios,
             | close to upper range of projections"
+    
+    fuel_price_shock : str
+        The extend to which the Ukraine war price shock is assumed to 
+        influence near-term future fuel price development
 
+        .. csv-table:: Price shocks and explanations
+            :header: "price shock", "explanation"
+            :widths: 20 80
+            
+            "high", "price peaks in 2026 and remains high until around 2030"
+            "low"", "price quickly stabilizes and reaches pre-war levels by 2026"
+    
     emissions_cost_pathway : str
         A predefined pathway for emissions cost development until 2030 or 2050
 
@@ -145,8 +156,10 @@ class InvestmentModel(object):
             | according to medium estimate", "| medium estimate,
             | values until 2050"
 
-    investment_cost_pathway : str
-        A predefined pathway for investment cost development until 2050
+    flexibility_options_scenario : str
+        A predefined scenario for flexibility options parameters
+        Options: '5', '50', '95', whereby '5' is the lower,
+        i.e. rather pessimistic estimate
 
     activate_emissions_limit : boolean
         boolean control variable indicating whether to introduce an overall
@@ -173,7 +186,7 @@ class InvestmentModel(object):
 
     demand_response_scenario : str
         A predefined demand response scenario to be modeled
-        Options: '25', '50', '75', whereby '25' is the lower,
+        Options: '5', '50', '95', whereby '5' is the lower,
         i.e. rather pessimistic estimate
 
     save_production_results : boolean
@@ -197,7 +210,7 @@ class InvestmentModel(object):
         of the simulation
 
     freq : str
-        Frequency of the simulation, i.e. freqeuncy of the pandas.date_range
+        Frequency of the simulation, i.e. frequency of the pandas.date_range
         object
     
     multiplier : int
@@ -229,8 +242,9 @@ class InvestmentModel(object):
         self.countries = None
         self.solver = None
         self.fuel_cost_pathway = None
+        self.fuel_price_shock = None
         self.emissions_cost_pathway = None
-        self.investment_cost_pathway = None
+        self.flexibility_options_scenario = None
         self.activate_emissions_limit = None
         self.emissions_pathway = None
         self.activate_demand_response = None

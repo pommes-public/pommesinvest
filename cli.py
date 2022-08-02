@@ -6,19 +6,22 @@ def create_default_config():
 
 # 1) Set overall workflow control parameters
 control_parameters:
-    rolling_horizon: False
-    countries: ['AT', 'BE', 'CH', 'CZ', 'DE', 'DK1', 'DK2', 'FR', 'NL',
-                'NO1', 'NO2', 'NO3', 'NO4', 'NO5', 'PL',
-                'SE1', 'SE2', 'SE3', 'SE4']
+    multi_period: True
+    myopic_horizon: False
+    interest_rate: 0.02
     solver: "gurobi"
-    fuel_cost_pathway: "middle"
+    fuel_cost_pathway: "NZE"
+    fuel_price_shock: "high"
+    emissions_cost_pathway: "long-term"
+    flexibility_options_scenario: "50"
     activate_emissions_limit: False
     emissions_pathway: "100_percent_linear"
     activate_demand_response: False
     demand_response_approach: "DLR"
     demand_response_scenario: "50"
+    impose_investment_maxima: True
     save_production_results: True
-    save_price_results: True
+    save_investment_results: True
     write_lp_file: False
 
 # 2) Set model optimization time and frequency

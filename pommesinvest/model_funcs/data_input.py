@@ -77,28 +77,34 @@ def parse_input_data(im):
     annual_time_series = {
         "transformers_exogenous_max_ts": "transformers_exogenous_max_ts",
         "costs_fuel_ts": (
-            f"costs_fuel_{im.fuel_cost_pathway}_nominal_indexed_ts"
+            f"costs_fuel_{im.fuel_cost_pathway}"
+            + f"_{im.fuel_price_shock}_nominal_indexed_ts"
         ),
         "costs_emissions_ts": (
             f"costs_emissions_{im.emissions_cost_pathway}_nominal_indexed_ts"
         ),
-        "costs_operation_ts": "costs_operation_nominal_indexed_ts",
+        "costs_operation_ts": (
+            f"variable_costs_{im.flexibility_options_scenario}%_nominal"
+        ),
         "costs_operation_storages_ts": (
             "costs_operation_storages_nominal_indexed_ts"
         ),
         "costs_investment": (
-            f"investment_expenses_{im.investment_cost_pathway}%_nominal"
+            f"investment_expenses_{im.flexibility_options_scenario}%_nominal"
         ),
         "costs_storages_investment_capacity": (
-            f"investment_expenses_storages_capacity_{im.investment_cost_pathway}%_nominal"  # noqa: E501
+            f"investment_expenses_storages_capacity_"
+            + f"{im.flexibility_options_scenario}%_nominal"
         ),
         "costs_storages_investment_power": (
-            f"investment_expenses_storages_power_{im.investment_cost_pathway}%_nominal"  # noqa: E501
+            f"investment_expenses_storages_power_"
+            + f"{im.flexibility_options_scenario}%_nominal"
         ),
     }
 
     other_files = {
-        "emission_limits": "emission_limits", "wacc": "wacc",
+        "emission_limits": "emission_limits",
+        "wacc": "wacc",
     }
 
     # Add demand response units
@@ -161,17 +167,13 @@ def resample_input_data(input_data, im):
         "costs_operation_storages_ts",
         "costs_investment",
         "costs_storages_investment_capacity",
-        "costs_storages_investment_power"
+        "costs_storages_investment_power",
     ]
     hourly_ts = [
-        "transformers_availability_ts",
-        "transformers_minload_ts",
         "sinks_demand_el_ts",
         "sources_renewables_ts",
-        "costs_fuel_ts",
-        "costs_emissions_ts",
-        "min_loads_dh",
-        "min_loads_ipp",
+        "transformers_minload_ts",
+        "transformers_availability_ts",
     ]
 
     transformer_columns = [
@@ -213,11 +215,9 @@ def resample_input_data(input_data, im):
             input_data[key].loc["2051-01-01"] = input_data[key].loc[
                 "2050-01-01"
             ]
-            input_data[key] = (
-                helpers.resample_timeseries(
-                    input_data[key], freq=im.freq, interpolation_rule="linear"
-                )[:-1],
-            )
+            input_data[key] = helpers.resample_timeseries(
+                input_data[key], freq=im.freq, interpolation_rule="linear"
+            )[:-1]
         elif key in hourly_ts:
             input_data[key] = helpers.resample_timeseries(
                 input_data[key], freq=im.freq, aggregation_rule="sum"

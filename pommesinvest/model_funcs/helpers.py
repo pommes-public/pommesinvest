@@ -157,12 +157,24 @@ def resample_timeseries(
         The resampled timeseries stored in a pd.DataFrame
 
     """
+    # Ensure a datetime index
+    try:
+        timeseries.index = pd.DatetimeIndex(timeseries.index)
+    except ValueError:
+        raise ValueError(
+            "Time series has an invalid index. "
+            "A pd.DatetimeIndex is required."
+        )
+
     try:
         original_freq = pd.infer_freq(timeseries.index, warn=True)
     except ValueError:
         original_freq = "AS"
 
-    if to_offset(freq) > to_offset(original_freq):
+    # Introduce common timestamp to be able to compare different frequencies
+    common_dt = pd.to_datetime("2000-01-01")
+
+    if common_dt + to_offset(freq) > common_dt + to_offset(original_freq):
         # do downsampling
         resampled_timeseries = timeseries.resample(freq).agg(aggregation_rule)
 
