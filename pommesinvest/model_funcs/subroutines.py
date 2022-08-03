@@ -240,12 +240,14 @@ def create_renewables(input_data, im, node_dict):
                                 im.start_time : im.end_time
                             ]
                         ),
-                        nominal_value=re["capacity_max"],
+                        nominal_value=re["capacity"],
                     )
                 },
             )
         except KeyError:
-            print(re)
+            raise KeyError(
+                f"Renewable source {i} not specified or causing trouble!"
+            )
 
     return node_dict
 
@@ -407,15 +409,15 @@ def create_demand_response_units(input_data, im, node_dict):
             ),
             "ep_costs": economics.annuity(
                 # TODO: Add individual entries for investment expenses to data basis
-                capex=input_data["investment_costs"].loc[i, im.startyear],
+                capex=input_data["investment_costs"].loc[i, im.start_year],
                 n=d["unit_lifetime"],
-                wacc=input_data["wacc"].loc[d["technology"], im.startyear],
+                wacc=input_data["wacc"].loc[d["technology"], im.start_year],
             ),
         }
 
         if im.multi_period:
             invest_kwargs["ep_costs"] = (
-                input_data["investment_costs"].loc[i, im.startyear],
+                input_data["investment_costs"].loc[i, im.start_year],
             )
             multi_period_invest_kwargs = {
                 "lifetime": d["lifetime"],
@@ -573,8 +575,14 @@ def create_exogenous_transformers(
 
         # TODO: Define minimum investment requirement for CHP units (also heat pumps etc as providers)
         maximum = (
-            input_data["transformers_exogenous_max_ts"].loc[im.start_time : im.end_time, i]
-        ).to_numpy()
+            (
+                input_data["transformers_exogenous_max_ts"].loc[
+                    im.start_time : im.end_time, i
+                ]
+            )
+            .mul(im.multiplier)
+            .to_numpy()
+        )
 
         outflow_args_el = {
             # Nominal value is the maximum capacity
@@ -582,7 +590,7 @@ def create_exogenous_transformers(
             "nominal_value": t["capacity_max"],
             "variable_costs": (
                 input_data["costs_operation_ts"]
-                .loc[im.start_time : im.end_time, ("operation_costs", t["from"])]
+                .loc[im.start_time : im.end_time, t["tech_fuel"]]
                 .to_numpy()
             ),
             "min": t["min_load_factor"],
@@ -626,7 +634,7 @@ def create_exogenous_transformers(
             input_data["transformers_exogenous_max_ts"]
             .loc[
                 im.start_time : im.end_time,
-                t,
+                i,
             ]
             .to_numpy()
         )
@@ -668,9 +676,9 @@ def create_new_built_transformers(
     """
     for i, t in input_data["new_built_transformers"].iterrows():
 
-        # overall invest limit is the amount of capacity that can be installed
+        # overall maximum is the amount of capacity that can be installed
         # at maximum, i.e. the potential limit of a given technology
-        overall_invest_limit = t["overall_invest_limit"]
+        overall_maximum = t["overall_maximum"]
         annual_invest_limit = t["max_invest"]
 
         if (
@@ -680,23 +688,23 @@ def create_new_built_transformers(
         ):
             invest_max = np.min(
                 [
-                    overall_invest_limit,
+                    overall_maximum,
                     annual_invest_limit * im.optimization_timeframe,
                 ]
             )
         else:
-            invest_max = 10000000.0
+            invest_max = float(1e10)
 
         invest_kwargs = {
             "maximum": invest_max,
-            # New built plants are installed at capacity costs for the start year
+            # New built plants are installed at capacity costs for start year
             # (of each myopic iteration = investment possibility)
             "ep_costs": economics.annuity(
-                capex=input_data["investment_costs"].loc[
-                    t["technology"], im.startyear
+                capex=input_data["costs_investment"].loc[
+                    f"{im.start_year}-01-01", t["tech_fuel"]
                 ],
                 n=t["unit_lifetime"],
-                wacc=input_data["wacc"].loc[t["technology"], im.startyear],
+                wacc=input_data["wacc"].loc[t["tech_fuel"], "wacc in p.u."],
             ),
             "existing": 0,
         }
@@ -704,16 +712,16 @@ def create_new_built_transformers(
             invest_max = annual_invest_limit
             invest_kwargs["maximum"] = invest_max
             invest_kwargs["ep_costs"] = np.array(
-                input_data["investment_costs"].loc[
-                    t["technology"], im.startyear : im.endyear
+                input_data["costs_investment"].loc[
+                    im.start_year : im.end_year, t["tech_fuel"],
                 ]
             )
             multi_period_invest_kwargs = {
-                "lifetime": t["lifetime"],
+                "lifetime": t["unit_lifetime"],
                 "age": 0,
                 "interest_rate": t["interest_rate"],
                 "fixed_costs": t["fixed_costs"],
-                "overall_maximum": overall_invest_limit,
+                "overall_maximum": overall_maximum,
             }
             invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
 
@@ -792,7 +800,7 @@ def create_new_built_transformers_myopic_horizon(
             # Set existing capacity for 0th iteration
             existing_capacity = 0
 
-        overall_invest_limit = t["overall_invest_limit"]
+        overall_maximum = t["overall_maximum"]
         annual_invest_limit = t["max_invest"]
 
         # invest_max is the amount of capacity that can maximally be installed
@@ -804,7 +812,7 @@ def create_new_built_transformers_myopic_horizon(
         ):
             invest_max = np.min(
                 [
-                    overall_invest_limit,
+                    overall_maximum,
                     annual_invest_limit * im.years_per_timeslice,
                 ]
             )
@@ -829,11 +837,11 @@ def create_new_built_transformers_myopic_horizon(
                 # (of each myopic iteration = investment possibility)
                 ep_costs=economics.annuity(
                     capex=input_data["investment_costs"].loc[
-                        t["bus_technology"], im.startyear
+                        t["bus_technology"], im.start_year
                     ],
                     n=t["unit_lifetime"],
                     wacc=input_data["wacc"].loc[
-                        t["bus_technology"], im.startyear
+                        t["bus_technology"], im.start_year
                     ],
                 ),
                 existing=existing_capacity,
@@ -1102,9 +1110,9 @@ def create_new_built_storages(input_data, im, node_dict):
     for i, s in input_data["new_built_storages"].iterrows():
         # overall invest limit is the amount of capacity that can be installed
         # at maximum, i.e. the potential limit of a given technology
-        overall_invest_limit_pump = s["overall_invest_limit_pump"]
-        overall_invest_limit_turbine = s["overall_invest_limit_turbine"]
-        overall_invest_limit = s["overall_invest_limit"]
+        overall_maximum_pump = s["overall_maximum_pump"]
+        overall_maximum_turbine = s["overall_maximum_turbine"]
+        overall_maximum = s["overall_maximum"]
 
         annual_invest_limit_pump = s["max_invest_pump"]
         annual_invest_limit_turbine = s["max_invest_turbine"]
@@ -1113,19 +1121,19 @@ def create_new_built_storages(input_data, im, node_dict):
         if im.impose_investment_maxima:
             invest_max_pump = np.min(
                 [
-                    overall_invest_limit_pump,
+                    overall_maximum_pump,
                     annual_invest_limit_pump * im.optimization_timeframe,
                 ]
             )
             invest_max_turbine = np.min(
                 [
-                    overall_invest_limit_turbine,
+                    overall_maximum_turbine,
                     annual_invest_limit_turbine * im.optimization_timeframe,
                 ]
             )
             invest_max = np.min(
                 [
-                    overall_invest_limit,
+                    overall_maximum,
                     annual_invest_limit * im.optimization_timeframe,
                 ]
             )
@@ -1134,14 +1142,14 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_max_turbine = 10000000.0
             invest_max = 10000000.0
 
-        wacc = input_data["wacc"].loc[i, im.startyear]
+        wacc = input_data["wacc"].loc[i, im.start_year]
 
         invest_kwargs = {
             "inflow": {
                 "maximum": invest_max_pump,
                 "ep_costs": economics.annuity(
                     capex=input_data["storage_pump_investment_costs"].loc[
-                        i, im.startyear
+                        i, im.start_year
                     ],
                     n=s["unit_lifetime_pump"],
                     wacc=wacc,
@@ -1152,7 +1160,7 @@ def create_new_built_storages(input_data, im, node_dict):
                 "maximum": invest_max_turbine,
                 "ep_costs": economics.annuity(
                     capex=input_data["storage_turbine_investment_costs"].loc[
-                        i, im.startyear
+                        i, im.start_year
                     ],
                     n=s["unit_lifetime_turbine"],
                     wacc=wacc,
@@ -1163,7 +1171,7 @@ def create_new_built_storages(input_data, im, node_dict):
                 "maximum": invest_max,
                 "ep_costs": economics.annuity(
                     capex=input_data["storage_investment_costs"].loc[
-                        i, im.startyear
+                        i, im.start_year
                     ],
                     n=s["unit_lifetime"],
                     wacc=wacc,
@@ -1182,17 +1190,17 @@ def create_new_built_storages(input_data, im, node_dict):
 
             invest_kwargs["inflow"]["ep_costs"] = (
                 input_data["storage_pump_investment_costs"].loc[
-                    i, im.startyear : im.endyear
+                    i, im.start_year : im.end_year
                 ],
             ).to_numpy()
             invest_kwargs["ouflow"]["ep_costs"] = (
                 input_data["storage_turbine_investment_costs"].loc[
-                    i, im.startyear : im.endyear
+                    i, im.start_year : im.end_year
                 ],
             ).to_numpy()
             invest_kwargs["capacity"]["ep_costs"] = (
                 input_data["storage_investment_costs"].loc[
-                    i, im.startyear : im.endyear
+                    i, im.start_year : im.end_year
                 ],
             ).to_numpy()
 
@@ -1202,21 +1210,21 @@ def create_new_built_storages(input_data, im, node_dict):
                     "age": 0,
                     "interest_rate": s["interest_rate"],
                     "fixed_costs": s["fixed_costs_pump"],
-                    "overall_maximum": overall_invest_limit_pump,
+                    "overall_maximum": overall_maximum_pump,
                 },
                 "outflow": {
                     "lifetime": s["lifetime_turbine"],
                     "age": 0,
                     "interest_rate": s["interest_rate"],
                     "fixed_costs": s["fixed_costs_turbine"],
-                    "overall_maximum": overall_invest_limit_turbine,
+                    "overall_maximum": overall_maximum_turbine,
                 },
                 "capacity": {
                     "lifetime": s["lifetime"],
                     "age": 0,
                     "interest_rate": s["interest_rate"],
                     "fixed_costs": s["fixed_costs_turbine"],
-                    "overall_maximum": overall_invest_limit_turbine,
+                    "overall_maximum": overall_maximum_turbine,
                 },
             }
 
@@ -1332,9 +1340,9 @@ def create_new_built_storages_myopic_horizon(
 
         # overall invest limit is the amount of capacity that can at maximum be installed
         # i.e. the potential limit of a given technology
-        overall_invest_limit_pump = s["overall_invest_limit_pump"]
-        overall_invest_limit_turbine = s["overall_invest_limit_turbine"]
-        overall_invest_limit = s["overall_invest_limit"]
+        overall_maximum_pump = s["overall_maximum_pump"]
+        overall_maximum_turbine = s["overall_maximum_turbine"]
+        overall_maximum = s["overall_maximum"]
 
         annual_invest_limit_pump = s["max_invest_pump"]
         annual_invest_limit_turbine = s["max_invest_turbine"]
@@ -1345,19 +1353,19 @@ def create_new_built_storages_myopic_horizon(
         if im.impose_investment_maxima:
             invest_max_pump = np.min(
                 [
-                    overall_invest_limit_pump,
+                    overall_maximum_pump,
                     annual_invest_limit_pump * im.years_per_timeslice,
                 ]
             )
             invest_max_turbine = np.min(
                 [
-                    overall_invest_limit_turbine,
+                    overall_maximum_turbine,
                     annual_invest_limit_turbine * im.years_per_timeslice,
                 ]
             )
             invest_max = np.min(
                 [
-                    overall_invest_limit,
+                    overall_maximum,
                     annual_invest_limit * im.years_per_timeslice,
                 ]
             )
@@ -1380,10 +1388,10 @@ def create_new_built_storages_myopic_horizon(
                         maximum=invest_max_pump,
                         ep_costs=economics.annuity(
                             capex=input_data["costs_storages_investment"].loc[
-                                i + "_pump", im.startyear
+                                i + "_pump", im.start_year
                             ],
                             n=s["unit_lifetime_pump"],
-                            wacc=input_data["wacc"].loc[i, im.startyear],
+                            wacc=input_data["wacc"].loc[i, im.start_year],
                         ),
                         existing=existing_pump,
                     ),
@@ -1401,10 +1409,10 @@ def create_new_built_storages_myopic_horizon(
                         maximum=invest_max_turbine,
                         ep_costs=economics.annuity(
                             capex=input_data["costs_storages_investment"].loc[
-                                i + "_turbine", im.startyear
+                                i + "_turbine", im.start_year
                             ],
                             n=s["unit_lifetime_turbine"],
-                            wacc=input_data["wacc"].loc[i, im.startyear],
+                            wacc=input_data["wacc"].loc[i, im.start_year],
                         ),
                         existing=existing_turbine,
                     ),
@@ -1426,10 +1434,10 @@ def create_new_built_storages_myopic_horizon(
                 maximum=invest_max,
                 ep_costs=economics.annuity(
                     capex=input_data["costs_storages_investment"].loc[
-                        i, im.startyear
+                        i, im.start_year
                     ],
                     n=s["unit_lifetime"],
-                    wacc=input_data["wacc"].loc[i, im.startyear],
+                    wacc=input_data["wacc"].loc[i, im.start_year],
                 ),
                 existing=existing,
             ),

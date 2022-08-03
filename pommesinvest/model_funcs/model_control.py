@@ -209,6 +209,9 @@ class InvestmentModel(object):
         A date string of format "YYYY-MM-DD hh:mm:ss" defining the end time
         of the simulation
 
+    optimization_timeframe: int
+        Model horizon in years
+    
     freq : str
         Frequency of the simulation, i.e. frequency of the pandas.date_range
         object
@@ -255,6 +258,7 @@ class InvestmentModel(object):
         self.write_lp_file = None
         self.start_time = None
         self.end_time = None
+        self.optimization_timeframe = None
         self.freq = None
         self.multiplier = None
         self.path_folder_input = None
@@ -395,9 +399,9 @@ class InvestmentModel(object):
 
     def initialize_logging(self):
         """Initialize logging by deriving a filename from the configuration"""
-        optimization_timeframe = helpers.years_between(
+        setattr(self, "optimization_timeframe", helpers.years_between(
             self.start_time, self.end_time
-        )
+        ) + 1)
 
         if not self.myopic_horizon:
             rh = "simple_"
@@ -408,7 +412,7 @@ class InvestmentModel(object):
             "investment_LP_start-"
             + self.start_time[:10]
             + "_"
-            + str(optimization_timeframe)
+            + str(self.optimization_timeframe)
             + "-years_"
             + rh
         )

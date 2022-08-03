@@ -165,9 +165,6 @@ def resample_input_data(input_data, im):
         "costs_emissions_ts",
         "costs_operation_ts",
         "costs_operation_storages_ts",
-        "costs_investment",
-        "costs_storages_investment_capacity",
-        "costs_storages_investment_power",
     ]
     hourly_ts = [
         "sinks_demand_el_ts",
