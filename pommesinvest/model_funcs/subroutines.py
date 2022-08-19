@@ -411,7 +411,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 # TODO: Add individual entries for investment expenses to data basis
                 capex=input_data["investment_costs"].loc[i, im.start_year],
                 n=d["unit_lifetime"],
-                wacc=input_data["wacc"].loc[d["technology"], im.start_year],
+                wacc=input_data["wacc"].loc[i, "wacc in p.u."],
             ),
         }
 
@@ -841,7 +841,7 @@ def create_new_built_transformers_myopic_horizon(
                     ],
                     n=t["unit_lifetime"],
                     wacc=input_data["wacc"].loc[
-                        t["bus_technology"], im.start_year
+                        t["tech_fuel"], "wacc in p.u."
                     ],
                 ),
                 existing=existing_capacity,
@@ -1089,12 +1089,12 @@ def create_new_built_storages(input_data, im, node_dict):
     new_built_storage_labels : list
         list of new-built storage labels
     """
-    for i, s in input_data["new_built_storages"].iterrows():
+    for i, s in input_data["new_built_storages_el"].iterrows():
         # overall invest limit is the amount of capacity that can be installed
         # at maximum, i.e. the potential limit of a given technology
-        overall_maximum_pump = s["overall_maximum_pump"]
-        overall_maximum_turbine = s["overall_maximum_turbine"]
-        overall_maximum = s["overall_maximum"]
+        overall_maximum_pump = s["overall_invest_limit_pump"]
+        overall_maximum_turbine = s["overall_invest_limit_turbine"]
+        overall_maximum = s["overall_invest_limit"]
 
         annual_invest_limit_pump = s["max_invest_pump"]
         annual_invest_limit_turbine = s["max_invest_turbine"]
@@ -1124,15 +1124,19 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_max_turbine = 10000000.0
             invest_max = 10000000.0
 
-        wacc = input_data["wacc"].loc[i, im.start_year]
+        wacc = input_data["wacc"].loc[
+            f"storage_el_{s['type']}", "wacc in p.u."
+        ]
 
         invest_kwargs = {
             "inflow": {
                 "maximum": invest_max_pump,
                 "ep_costs": economics.annuity(
-                    capex=input_data["storage_pump_investment_costs"].loc[
+                    # Adjust capex by storage inflow efficiency
+                    # (more inflow capacity needs to be build)
+                    capex=input_data["storage_investment_costs_power"].loc[
                         i, im.start_year
-                    ],
+                    ] * s["efficiency_pump"],
                     n=s["unit_lifetime_pump"],
                     wacc=wacc,
                 ),
@@ -1141,9 +1145,9 @@ def create_new_built_storages(input_data, im, node_dict):
             "outflow": {
                 "maximum": invest_max_turbine,
                 "ep_costs": economics.annuity(
-                    capex=input_data["storage_turbine_investment_costs"].loc[
-                        i, im.start_year
-                    ],
+                    # Use symbolic cost values and attribute actual costs
+                    # to storage capacity itself resp. inflow
+                    capex=1e-8,
                     n=s["unit_lifetime_turbine"],
                     wacc=wacc,
                 ),
@@ -1152,7 +1156,7 @@ def create_new_built_storages(input_data, im, node_dict):
             "capacity": {
                 "maximum": invest_max,
                 "ep_costs": economics.annuity(
-                    capex=input_data["storage_investment_costs"].loc[
+                    capex=input_data["storage_investment_costs_capacity"].loc[
                         i, im.start_year
                     ],
                     n=s["unit_lifetime"],
@@ -1171,19 +1175,15 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_kwargs["capacity"]["maximum"] = invest_max
 
             invest_kwargs["inflow"]["ep_costs"] = (
-                input_data["storage_pump_investment_costs"].loc[
+                input_data["storage_investment_costs_power"].loc[
                     i, im.start_year : im.end_year
-                ],
+                ] * s["efficiency_pump"]
             ).to_numpy()
-            invest_kwargs["ouflow"]["ep_costs"] = (
-                input_data["storage_turbine_investment_costs"].loc[
-                    i, im.start_year : im.end_year
-                ],
-            ).to_numpy()
+            invest_kwargs["ouflow"]["ep_costs"] = 1e-8
             invest_kwargs["capacity"]["ep_costs"] = (
-                input_data["storage_investment_costs"].loc[
+                input_data["storage_investment_costs_capacity"].loc[
                     i, im.start_year : im.end_year
-                ],
+                ]
             ).to_numpy()
 
             multi_period_invest_kwargs = {
