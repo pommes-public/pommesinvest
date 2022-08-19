@@ -102,9 +102,14 @@ def parse_input_data(im):
         ),
     }
 
+    # Time-invariant data sets
     other_files = {
         "emission_limits": "emission_limits",
         "wacc": "wacc",
+        "interest_rate": "interest_rate",
+        "fixed_costs": (
+            f"fixed_costs_{im.flexibility_options_scenario}%_nominal"
+        ),
     }
 
     # Add demand response units
