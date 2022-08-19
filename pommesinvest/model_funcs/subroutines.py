@@ -1074,7 +1074,7 @@ def create_new_built_storages(input_data, im, node_dict):
         The input data given as a dict of DataFrames
         with component names as keys
 
-    im : :class:`InvestmenthModel`
+    im : :class:`InvestmentModel`
         The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
@@ -1134,9 +1134,10 @@ def create_new_built_storages(input_data, im, node_dict):
                 "ep_costs": economics.annuity(
                     # Adjust capex by storage inflow efficiency
                     # (more inflow capacity needs to be build)
-                    capex=input_data["storage_investment_costs_power"].loc[
-                        i, im.start_year
-                    ] * s["efficiency_pump"],
+                    capex=input_data["costs_storages_investment_power"].loc[
+                        f"{im.start_year}-01-01", f"storage_el_{s['type']}"
+                    ]
+                    * s["efficiency_pump"],
                     n=s["unit_lifetime_pump"],
                     wacc=wacc,
                 ),
@@ -1156,8 +1157,8 @@ def create_new_built_storages(input_data, im, node_dict):
             "capacity": {
                 "maximum": invest_max,
                 "ep_costs": economics.annuity(
-                    capex=input_data["storage_investment_costs_capacity"].loc[
-                        i, im.start_year
+                    capex=input_data["costs_storages_investment_capacity"].loc[
+                        f"{im.start_year}-01-01", f"storage_el_{s['type']}"
                     ],
                     n=s["unit_lifetime"],
                     wacc=wacc,
@@ -1175,37 +1176,49 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_kwargs["capacity"]["maximum"] = invest_max
 
             invest_kwargs["inflow"]["ep_costs"] = (
-                input_data["storage_investment_costs_power"].loc[
-                    i, im.start_year : im.end_year
-                ] * s["efficiency_pump"]
+                input_data["costs_storages_investment_power"].loc[
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                    f"storage_el_{s['type']}",
+                ]
+                * s["efficiency_pump"]
             ).to_numpy()
-            invest_kwargs["ouflow"]["ep_costs"] = 1e-8
+            invest_kwargs["outflow"]["ep_costs"] = 1e-8
             invest_kwargs["capacity"]["ep_costs"] = (
-                input_data["storage_investment_costs_capacity"].loc[
-                    i, im.start_year : im.end_year
+                input_data["costs_storages_investment_capacity"].loc[
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                    f"storage_el_{s['type']}",
                 ]
             ).to_numpy()
 
             multi_period_invest_kwargs = {
                 "inflow": {
-                    "lifetime": s["lifetime_pump"],
+                    "lifetime": s["unit_lifetime_pump"],
                     "age": 0,
-                    "interest_rate": s["interest_rate"],
-                    "fixed_costs": s["fixed_costs_pump"],
+                    "interest_rate": input_data["interest_rate"].loc["value"][
+                        0
+                    ],
+                    # "fixed_costs": s["fixed_costs_pump"],
                     "overall_maximum": overall_maximum_pump,
                 },
                 "outflow": {
-                    "lifetime": s["lifetime_turbine"],
+                    "lifetime": s["unit_lifetime_turbine"],
                     "age": 0,
-                    "interest_rate": s["interest_rate"],
-                    "fixed_costs": s["fixed_costs_turbine"],
+                    "interest_rate": input_data["interest_rate"].loc["value"][
+                        0
+                    ],
+                    # "fixed_costs": s["fixed_costs_turbine"],
                     "overall_maximum": overall_maximum_turbine,
                 },
                 "capacity": {
-                    "lifetime": s["lifetime"],
+                    "lifetime": s["unit_lifetime"],
                     "age": 0,
-                    "interest_rate": s["interest_rate"],
-                    "fixed_costs": s["fixed_costs_turbine"],
+                    "interest_rate": input_data["interest_rate"].loc["value"][
+                        0
+                    ],
+                    "fixed_costs": input_data["fixed_costs"].loc[
+                        f"storage_el_{s['type']}",
+                        "fixed_costs_percent_per_year",
+                    ],
                     "overall_maximum": overall_maximum_turbine,
                 },
             }
