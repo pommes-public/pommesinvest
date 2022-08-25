@@ -15,8 +15,9 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 
 (*) Corresponding authors
 """
-
+import numpy as np
 import pandas as pd
+
 from pommesinvest.model_funcs import helpers
 from pommesinvest.model_funcs.subroutines import (
     create_buses,
@@ -87,7 +88,7 @@ def parse_input_data(im):
             f"variable_costs_{im.flexibility_options_scenario}%_nominal"
         ),
         "costs_operation_storages_ts": (
-            "costs_operation_storages_nominal_indexed_ts"
+            f"variable_costs_storages_{im.flexibility_options_scenario}%_nominal"  # noqa: E501
         ),
         "costs_investment": (
             f"investment_expenses_{im.flexibility_options_scenario}%_nominal"
@@ -109,6 +110,9 @@ def parse_input_data(im):
         "interest_rate": "interest_rate",
         "fixed_costs": (
             f"fixed_costs_{im.flexibility_options_scenario}%_nominal"
+        ),
+        "fixed_costs_storages": (
+            f"fixed_costs_storages_{im.flexibility_options_scenario}%_nominal"
         ),
     }
 
@@ -204,9 +208,7 @@ def resample_input_data(input_data, im):
             # Add additional columns for existing units and remove later on
             if not "new_built" in key:
                 storages_columns.extend(existing_storages_add_columns)
-            input_data[key] = input_data[key].where(
-                pd.notnull(input_data[key]), None
-            )
+            input_data[key] = input_data[key].replace({np.nan: None})
             input_data[key].loc[:, storages_columns] = (
                 input_data[key].loc[:, storages_columns].mul(im.multiplier)
             )

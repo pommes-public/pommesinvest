@@ -886,7 +886,8 @@ def create_exogenous_storages(input_data, im, node_dict):
                         nominal_value=s["capacity_pump"],
                         variable_costs=(
                             input_data["costs_operation_storages_ts"].loc[
-                                im.start_time : im.end_time, i
+                                im.start_time : im.end_time,
+                                f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
                     )
@@ -896,7 +897,8 @@ def create_exogenous_storages(input_data, im, node_dict):
                         nominal_value=s["capacity_turbine"],
                         variable_costs=(
                             input_data["costs_operation_storages_ts"].loc[
-                                im.start_time : im.end_time, i
+                                im.start_time : im.end_time,
+                                f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
                     )
@@ -920,7 +922,8 @@ def create_exogenous_storages(input_data, im, node_dict):
                         nominal_value=s["capacity_turbine"],
                         variable_costs=(
                             input_data["costs_operation_storages_ts"].loc[
-                                im.start_time : im.end_time, i
+                                im.start_time : im.end_time,
+                                f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
                         min=s["min_load_factor"],
@@ -1215,7 +1218,7 @@ def create_new_built_storages(input_data, im, node_dict):
                     "interest_rate": input_data["interest_rate"].loc["value"][
                         0
                     ],
-                    "fixed_costs": input_data["fixed_costs"].loc[
+                    "fixed_costs": input_data["fixed_costs_storages"].loc[
                         f"storage_el_{s['type']}",
                         "fixed_costs_percent_per_year",
                     ],
@@ -1231,10 +1234,10 @@ def create_new_built_storages(input_data, im, node_dict):
         node_dict[i] = solph.components.GenericStorage(
             label=i,
             inputs={
-                node_dict[s["bus"]]: solph.flows.Flow(
+                node_dict[s["bus_inflow"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_operation_storages_ts"].loc[
-                            im.start_time : im.end_time, i
+                            im.start_time : im.end_time, f"storage_el_{s['type']}"
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
@@ -1242,10 +1245,10 @@ def create_new_built_storages(input_data, im, node_dict):
                 )
             },
             outputs={
-                node_dict[s["bus"]]: solph.flows.Flow(
+                node_dict[s["bus_outflow"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_operation_storages_ts"].loc[
-                            im.start_time : im.end_time, i
+                            im.start_time : im.end_time, f"storage_el_{s['type']}"
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
