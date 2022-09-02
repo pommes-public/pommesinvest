@@ -164,6 +164,8 @@ def create_commodity_sources(input_data, im, node_dict):
                         input_data["costs_fuel_ts"]
                         .loc[im.start_time : im.end_time, i]
                         .to_numpy()
+                        # TODO: Decide on whether or not to keep emission
+                        #  costs out / endogenously determined
                         + input_data["costs_emissions_ts"]
                         .loc[im.start_time : im.end_time, i]
                         .to_numpy()
@@ -713,7 +715,7 @@ def create_new_built_transformers(
             invest_kwargs["maximum"] = invest_max
             invest_kwargs["ep_costs"] = np.array(
                 input_data["costs_investment"].loc[
-                    im.start_year : im.end_year,
+                    im.start_year : str(int(im.end_year) + 1),
                     t["tech_fuel"],
                 ]
             )
@@ -1180,7 +1182,7 @@ def create_new_built_storages(input_data, im, node_dict):
 
             invest_kwargs["inflow"]["ep_costs"] = (
                 input_data["costs_storages_investment_power"].loc[
-                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                    f"{im.start_year}-01-01":f"{int(im.end_year) + 1}-01-01",
                     f"storage_el_{s['type']}",
                 ]
                 * s["efficiency_pump"]
@@ -1188,7 +1190,7 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_kwargs["outflow"]["ep_costs"] = 1e-8
             invest_kwargs["capacity"]["ep_costs"] = (
                 input_data["costs_storages_investment_capacity"].loc[
-                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                    f"{im.start_year}-01-01":f"{int(im.end_year) + 1}-01-01",
                     f"storage_el_{s['type']}",
                 ]
             ).to_numpy()
@@ -1237,7 +1239,8 @@ def create_new_built_storages(input_data, im, node_dict):
                 node_dict[s["bus_inflow"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_operation_storages_ts"].loc[
-                            im.start_time : im.end_time, f"storage_el_{s['type']}"
+                            im.start_time : im.end_time,
+                            f"storage_el_{s['type']}",
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
@@ -1248,7 +1251,8 @@ def create_new_built_storages(input_data, im, node_dict):
                 node_dict[s["bus_outflow"]]: solph.flows.Flow(
                     variable_costs=(
                         input_data["costs_operation_storages_ts"].loc[
-                            im.start_time : im.end_time, f"storage_el_{s['type']}"
+                            im.start_time : im.end_time,
+                            f"storage_el_{s['type']}",
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
@@ -1265,7 +1269,7 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_relation_output_capacity=s[
                 "invest_relation_output_capacity"
             ],
-            investment=solph.Investment(**invest_kwargs),
+            investment=solph.Investment(**invest_kwargs["capacity"]),
         )
 
     return node_dict
