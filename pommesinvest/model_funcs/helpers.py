@@ -133,12 +133,16 @@ def multiple_leap_years(years):
 def resample_timeseries(
     timeseries, freq, aggregation_rule="sum", interpolation_rule="linear"
 ):
-
     """Resample a timeseries to the frequency provided
 
     The frequency of the given timeseries is determined at first and upsampling
     resp. downsampling are carried out afterwards. For upsampling linear
     interpolation (default) is used, but another method may be chosen.
+
+    Time series indices ignore time shifts and can be interpreted as UTC time.
+    Since they aren't localized, this cannot be detected by pandas and the
+    correct frequency cannot be inferred. As a hack, only the first couple of
+    time steps are checked, for which no problems should occur.
 
     Parameters
     ----------
@@ -170,6 +174,13 @@ def resample_timeseries(
         original_freq = pd.infer_freq(timeseries.index, warn=True)
     except ValueError:
         original_freq = "AS"
+
+    # Hack for problems with recognizing abolishing the time shift
+    if not original_freq:
+        try:
+            original_freq = pd.infer_freq(timeseries.index[:5], warn=True)
+        except ValueError:
+            raise ValueError("Cannot detect frequency of time series!")
 
     # Introduce common timestamp to be able to compare different frequencies
     common_dt = pd.to_datetime("2000-01-01")

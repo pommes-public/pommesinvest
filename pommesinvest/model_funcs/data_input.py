@@ -194,9 +194,9 @@ def resample_input_data(input_data, im):
         "loss_rate",
     ]
     existing_storages_add_columns = [
-        "nominal_storable_energy",
         "max_load_factor",
         "min_load_factor",
+        "initial_storage_level",
     ]
 
     for key in input_data.keys():

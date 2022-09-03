@@ -715,7 +715,7 @@ def create_new_built_transformers(
             invest_kwargs["maximum"] = invest_max
             invest_kwargs["ep_costs"] = np.array(
                 input_data["costs_investment"].loc[
-                    im.start_year : str(int(im.end_year) + 1),
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
                     t["tech_fuel"],
                 ]
             )
@@ -892,6 +892,8 @@ def create_exogenous_storages(input_data, im, node_dict):
                                 f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
+                        min=s["min_load_factor"],
+                        max=s["max_load_factor"],
                     )
                 },
                 outputs={
@@ -903,6 +905,8 @@ def create_exogenous_storages(input_data, im, node_dict):
                                 f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
+                        min=s["min_load_factor"],
+                        max=s["max_load_factor"],
                     )
                 },
                 nominal_storage_capacity=s["nominal_storable_energy"],
@@ -956,7 +960,7 @@ def create_exogenous_storages_myopic_horizon(
         The input data given as a dict of DataFrames
         with component names as keys
 
-    im : :class:`InvestmenthModel`
+    im : :class:`InvestmentModel`
         The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
@@ -1125,9 +1129,9 @@ def create_new_built_storages(input_data, im, node_dict):
                 ]
             )
         else:
-            invest_max_pump = 10000000.0
-            invest_max_turbine = 10000000.0
-            invest_max = 10000000.0
+            invest_max_pump = 1e9
+            invest_max_turbine = 1e9
+            invest_max = 1e9
 
         wacc = input_data["wacc"].loc[
             f"storage_el_{s['type']}", "wacc in p.u."
@@ -1182,7 +1186,7 @@ def create_new_built_storages(input_data, im, node_dict):
 
             invest_kwargs["inflow"]["ep_costs"] = (
                 input_data["costs_storages_investment_power"].loc[
-                    f"{im.start_year}-01-01":f"{int(im.end_year) + 1}-01-01",
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
                     f"storage_el_{s['type']}",
                 ]
                 * s["efficiency_pump"]
@@ -1190,7 +1194,7 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_kwargs["outflow"]["ep_costs"] = 1e-8
             invest_kwargs["capacity"]["ep_costs"] = (
                 input_data["costs_storages_investment_capacity"].loc[
-                    f"{im.start_year}-01-01":f"{int(im.end_year) + 1}-01-01",
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
                     f"storage_el_{s['type']}",
                 ]
             ).to_numpy()
@@ -1289,7 +1293,7 @@ def create_new_built_storages_myopic_horizon(
         The input data given as a dict of DataFrames
         with component names as keys
 
-    im : :class:`InvestmenthModel`
+    im : :class:`InvestmentModel`
         The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`

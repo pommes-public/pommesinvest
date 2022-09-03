@@ -91,18 +91,18 @@ class InvestmentModel(object):
             "regression", "| Linear regression based on historic
             | commodity prices from 1991-2020", "| compared to IEA's scenarios,
             | close to upper range of projections"
-    
+
     fuel_price_shock : str
-        The extend to which the Ukraine war price shock is assumed to 
+        The extend to which the Ukraine war price shock is assumed to
         influence near-term future fuel price development
 
         .. csv-table:: Price shocks and explanations
             :header: "price shock", "explanation"
             :widths: 20 80
-            
+
             "high", "price peaks in 2026 and remains high until around 2030"
             "low"", "price quickly stabilizes and reaches pre-war levels by 2026"
-    
+
     emissions_cost_pathway : str
         A predefined pathway for emissions cost development until 2030 or 2050
 
@@ -211,14 +211,14 @@ class InvestmentModel(object):
 
     optimization_timeframe: int
         Model horizon in years
-    
+
     freq : str
         Frequency of the simulation, i.e. frequency of the pandas.date_range
         object
-    
+
     multiplier : int
         multiplier to transform parameters defined for hourly frequency
-    
+
     path_folder_input : str
         The path to the folder where the input data is stored
 
@@ -302,7 +302,9 @@ class InvestmentModel(object):
 
     def set_multiplier(self):
         """Set multiplier and timesteps dependent on frequency attribute"""
-        self.multiplier = helpers.FREQUENCY_TO_TIMESTEPS[self.freq]["multiplier"]
+        self.multiplier = helpers.FREQUENCY_TO_TIMESTEPS[self.freq][
+            "multiplier"
+        ]
 
     def check_model_configuration(self):
         """Checks if any necessary model parameter hasn't been set yet"""
@@ -399,9 +401,11 @@ class InvestmentModel(object):
 
     def initialize_logging(self):
         """Initialize logging by deriving a filename from the configuration"""
-        setattr(self, "optimization_timeframe", helpers.years_between(
-            self.start_time, self.end_time
-        ) + 1)
+        setattr(
+            self,
+            "optimization_timeframe",
+            helpers.years_between(self.start_time, self.end_time) + 1,
+        )
 
         if not self.myopic_horizon:
             rh = "simple_"
@@ -454,7 +458,10 @@ class InvestmentModel(object):
         )
         if self.multi_period:
             es = solph.EnergySystem(
-                timeindex=datetime_index, multi_period=True
+                timeindex=datetime_index,
+                timeincrement=[self.multiplier] * len(datetime_index),
+                multi_period=True,
+                infer_last_interval=False,
             )
         else:
             es = solph.EnergySystem(timeindex=datetime_index)
