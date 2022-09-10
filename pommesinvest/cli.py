@@ -14,8 +14,10 @@ control_parameters:
     fuel_cost_pathway: "NZE"
     emissions_cost_pathway: "long-term"
     investment_cost_pathway: "50"
-    activate_emissions_limit: False
-    emissions_pathway: "100_percent_linear"
+    activate_emissions_budget_limit: False
+    emissions_budget_limit: 1000000
+    activate_emissions_pathway_limit: True
+    emissions_pathway: "KNS_2035"
     activate_demand_response: False
     demand_response_approach: "DLR"
     demand_response_scenario: "50"

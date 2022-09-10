@@ -161,17 +161,26 @@ class InvestmentModel(object):
         Options: '5', '50', '95', whereby '5' is the lower,
         i.e. rather pessimistic estimate
 
-    activate_emissions_limit : boolean
+    activate_emissions_budget_limit : boolean
         boolean control variable indicating whether to introduce an overall
-        emissions limit
+        emissions budget limit
+        Note: Combining an emissions limit with comparatively high minimum
+        loads of conventionals may lead to an infeasible model configuration
+        since either one of the restrictions may not be reached.
+
+    activate_emissions_pathway_limit : boolean
+        boolean control variable indicating whether to introduce an
+        emissions pathway limit
         Note: Combining an emissions limit with comparatively high minimum
         loads of conventionals may lead to an infeasible model configuration
         since either one of the restrictions may not be reached.
 
     emissions_pathway : str
         A predefined pathway for emissions reduction until 2045
-        Options: '100_percent_linear', '95_percent_linear', '80_percent_linear'
-        or 'BAU'
+        Options: '100_percent_linear', '95_percent_linear',
+        '80_percent_linear', 'KNS_2035' or 'BAU'
+        If an emissions budget limit is chosen, it is calculated based on the
+        given pathway.
 
     activate_demand_response : boolean
         boolean control variable indicating whether to introduce
@@ -248,7 +257,8 @@ class InvestmentModel(object):
         self.fuel_price_shock = None
         self.emissions_cost_pathway = None
         self.flexibility_options_scenario = None
-        self.activate_emissions_limit = None
+        self.activate_emissions_budget_limit = None
+        self.activate_emissions_pathway_limit = None
         self.emissions_pathway = None
         self.activate_demand_response = None
         self.demand_response_approach = None
@@ -333,6 +343,17 @@ class InvestmentModel(object):
                 logging.info(
                     f"Using investment cost pathway: {getattr(self, entry)}"
                 )
+
+        if (
+            self.activate_emissions_budget_limit
+            and self.activate_emissions_pathway_limit
+        ):
+            raise ValueError(
+                "You set both, 'activate_emissions_budget_limit' and "
+                "'activate_emissions_pathway_limit' to True.\n"
+                "They are mutually exclusive. "
+                "Choose either one of both and set the other to False."
+            )
 
         return missing_parameters
 
@@ -456,10 +477,13 @@ class InvestmentModel(object):
         datetime_index = pd.date_range(
             self.start_time, self.end_time, freq=self.freq
         )
+        # TODO: Explicitly define periods or change
+        #  from hourly frequency as a default
         if self.multi_period:
             es = solph.EnergySystem(
                 timeindex=datetime_index,
                 timeincrement=[self.multiplier] * len(datetime_index),
+                freq=self.freq,
                 multi_period=True,
                 infer_last_interval=False,
             )
@@ -480,7 +504,8 @@ class InvestmentModel(object):
     def add_further_constrs(self, emissions_limit, countries=None, fuels=None):
         r"""Integrate further constraints into the optimization model
 
-        For now, an additional overall emissions limit can be imposed.
+        For now, an additional overall emissions budget limit or an
+        emissions pathway limit can be imposed.
 
         Note that setting an emissions limit may conflict with high minimum
         loads from conventional transformers.
@@ -526,12 +551,21 @@ class InvestmentModel(object):
             if any(x in o.label for x in emission_flow_labels):
                 emission_flows[(i, o)] = self.om.flows[(i, o)]
 
-        if self.activate_emissions_limit:
+        if self.activate_emissions_budget_limit:
             solph.constraints.emission_limit(
                 self.om, flows=emission_flows, limit=emissions_limit
             )
             logging.info(
-                f"Adding an EMISSIONS LIMIT of {emissions_limit} t CO2"
+                f"Adding an EMISSIONS BUDGET LIMIT of {emissions_limit:,.0f} "
+                f"t CO2"
+            )
+        elif self.activate_emissions_pathway_limit:
+            solph.constraints.emission_limit_per_period(
+                self.om, flows=emission_flows, limit=emissions_limit
+            )
+            logging.info(
+                f"Introducing an EMISSIONS PATHWAY LIMIT using pathway "
+                f"{self.emissions_pathway}."
             )
 
     def build_myopic_horizon_model(self, counter, iteration_results):

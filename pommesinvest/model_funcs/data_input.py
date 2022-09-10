@@ -272,33 +272,6 @@ def add_components(input_data, im):
     return node_dict
 
 
-def add_limits(
-    input_data,
-    im,
-):
-    """Add further limits to the optimization model (emissions limit for now)
-
-    Parameters
-    ----------
-    input_data: :obj:`dict` of :class:`pd.DataFrame`
-        The input data given as a dict of DataFrames
-        with component names as keys
-
-    im : :class:`InvestmentModel`
-        The investment model that is considered
-
-    Returns
-    -------
-    emissions_limit : :obj:`float`
-        The emissions limit to be used (converted)
-    """
-    return helpers.convert_annual_limit(
-        input_data["emission_limits"][im.emission_pathway],
-        im.starttime,
-        im.endtime,
-    )
-
-
 def nodes_from_csv(im):
     r"""Build oemof.solph components from input data
 
@@ -312,8 +285,9 @@ def nodes_from_csv(im):
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
 
-    emissions_limit : int or None
-        The overall emissions limit
+    emissions_limit : int, pd.Series or None
+        An overall emissions budget limit or an emissions limit per period
+        or None if not specified
     """
     input_data = parse_input_data(im)
     resample_input_data(input_data, im)
@@ -325,10 +299,17 @@ def nodes_from_csv(im):
     node_dict = create_new_built_storages(input_data, im, node_dict)
 
     emissions_limit = None
-    if im.activate_emissions_limit:
-        emissions_limit = add_limits(
-            input_data,
-            im,
+    if im.activate_emissions_budget_limit:
+        emissions_limit = helpers.convert_annual_limit(
+            input_data["emission_limits"][im.emissions_pathway],
+            im.start_time,
+            im.end_time,
+        )
+    elif im.activate_emissions_pathway_limit:
+        emissions_limit = list(
+            input_data["emission_limits"]
+            .loc[f"{im.start_year}" : f"{im.end_year}", im.emissions_pathway]
+            .values
         )
 
     return node_dict, emissions_limit
@@ -408,7 +389,11 @@ def nodes_from_csv_myopic_horizon(im, iteration_results):
     }
 
     emissions_limit = None
-    if im.activate_emissions_limit:
-        emissions_limit = add_limits(input_data, im)
+    if im.activate_emissions_budget_limit:
+        emissions_limit = helpers.convert_annual_limit(
+            input_data["emission_limits"][im.emissions_pathway],
+            im.start_time,
+            im.end_time,
+        )
 
     return node_dict, emissions_limit, transformer_and_storage_labels

@@ -10,8 +10,9 @@ control_parameters:
     fuel_price_shock: "high"
     emissions_cost_pathway: "long-term"
     flexibility_options_scenario: "50"
-    activate_emissions_limit: False
-    emissions_pathway: "100_percent_linear"
+    activate_emissions_budget_limit: False
+    activate_emissions_pathway_limit: True
+    emissions_pathway: "KNS_2035"
     activate_demand_response: False
     demand_response_approach: "DLR"
     demand_response_scenario: "50"
@@ -23,8 +24,8 @@ control_parameters:
 # 2) Set model optimization time and frequency
 time_parameters:
     start_time: "2020-01-01 00:00:00"
-    end_time: "2020-01-02 23:00:00"
-    freq: "4H"
+    end_time: "2024-12-30 23:00:00"
+    freq: "24H"
 
 # 3) Set input and output data paths
 input_output_parameters:
