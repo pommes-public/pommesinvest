@@ -114,6 +114,7 @@ def parse_input_data(im):
         "fixed_costs_storages": (
             f"fixed_costs_storages_{im.flexibility_options_scenario}%_nominal"
         ),
+        "hydrogen_investment_maxima": "hydrogen_investment_maxima"
     }
 
     # Add demand response units

@@ -11,7 +11,7 @@ control_parameters:
     emissions_cost_pathway: "long-term"
     flexibility_options_scenario: "50"
     activate_emissions_budget_limit: False
-    activate_emissions_pathway_limit: True
+    activate_emissions_pathway_limit: False
     emissions_pathway: "KNS_2035"
     activate_demand_response: False
     demand_response_approach: "DLR"

@@ -683,7 +683,21 @@ def create_new_built_transformers(
         overall_maximum = t["overall_maximum"]
         annual_invest_limit = t["max_invest"]
 
-        if (
+        if "_hydrogen_" in i:
+            annual_invest_limit = (
+                input_data["hydrogen_investment_maxima"]
+                .loc[im.start_year : im.end_year]
+                .values
+            )
+            if im.impose_investment_maxima:
+                invest_max = [
+                    np.minimum(overall_maximum, annual_limit)[0]
+                    for annual_limit in annual_invest_limit
+                ]
+            else:
+                invest_max = float(1e10)
+
+        elif (
             not im.impose_investment_maxima
             and "water" in i
             or im.impose_investment_maxima
@@ -711,7 +725,8 @@ def create_new_built_transformers(
             ),
         }
         if im.multi_period:
-            invest_max = annual_invest_limit
+            if "_hydrogen_" not in i:
+                invest_max = annual_invest_limit
             invest_kwargs["maximum"] = invest_max
             invest_kwargs["ep_costs"] = np.array(
                 input_data["costs_investment"].loc[
