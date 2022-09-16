@@ -114,11 +114,25 @@ def parse_input_data(im):
         "fixed_costs_storages": (
             f"fixed_costs_storages_{im.flexibility_options_scenario}%_nominal"
         ),
-        "hydrogen_investment_maxima": "hydrogen_investment_maxima"
+        "hydrogen_investment_maxima": "hydrogen_investment_maxima",
     }
 
     # Add demand response units
     if im.activate_demand_response:
+        # Obtain clusters from file to avoid hard-coding
+        components[
+            "demand_response_clusters_eligibility"
+        ] = "demand_response_clusters_eligibility"
+        dr_clusters = load_input_data(
+            filename="demand_response_clusters_eligibility", im=im
+        )
+
+        for dr_cluster in dr_clusters.iterrows():
+            components[f"sink_dr_el_{dr_cluster}"] = (
+                f"{dr_cluster}_potential_parameters_nominal_"
+                f"{im.demand_response_scenario}%"
+            )
+
         components[
             "sinks_dr_el"
         ] = f"sinks_demand_response_el_{im.demand_response_scenario}"
@@ -309,7 +323,7 @@ def nodes_from_csv(im):
     elif im.activate_emissions_pathway_limit:
         emissions_limit = list(
             input_data["emission_limits"]
-            .loc[f"{im.start_year}" : f"{im.end_year}", im.emissions_pathway]
+            .loc[f"{im.start_year}":f"{im.end_year}", im.emissions_pathway]
             .values
         )
 
