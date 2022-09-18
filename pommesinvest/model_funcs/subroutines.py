@@ -299,7 +299,7 @@ def create_demand_response_units(input_data, im, node_dict):
     r"""Create demand response units and add them to the dict of nodes.
 
     The demand response modeling approach can be chosen from different
-    approaches that have been implemented.
+    approaches that have been implemented in oemof.solph.
 
     Parameters
     ----------
@@ -318,60 +318,84 @@ def create_demand_response_units(input_data, im, node_dict):
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Modified dictionary containing all nodes of the EnergySystem including
         the demand response sink elements
-
-    dr_overall_load_ts : :class:`pandas.Series`
-        The overall baseline load time series from demand response units
-        which is used to decrement overall electrical load for Germany
-        NOTE: This shall be substituted through a version which already
-        includes this in the data preparation
     """
+    for dr_cluster, eligibility in input_data[
+        "demand_response_clusters_eligibility"
+    ].iterrows():
+        # Introduce shortcut for demand response data set
+        dr_cluster_data = input_data[f"sink_dr_el_{dr_cluster}"]
 
-    for i, d in input_data["sinks_dr_el"].iterrows():
         # kwargs for all demand response modeling approaches
         kwargs_all = {
             "demand": np.array(
-                input_data["sinks_dr_el_ts"][i].loc[
+                input_data["sinks_dr_el_ts"][dr_cluster].loc[
                     im.start_time : im.end_time
                 ]
             ),
             "capacity_up": np.array(
-                input_data["sinks_dr_el_ava_neg_ts"][i].loc[
+                input_data["sinks_dr_el_ava_neg_ts"][dr_cluster].loc[
                     im.start_time : im.end_time
                 ]
             ),
-            "flex_share_up": d["flex_share_up"],
+            "flex_share_up": 1,  # TODO: Replace hard-coded entries!
             "capacity_down": np.array(
-                input_data["sinks_dr_el_ava_pos_ts"][i].loc[
+                input_data["sinks_dr_el_ava_pos_ts"][dr_cluster].loc[
                     im.start_time : im.end_time
                 ]
             ),
-            "flex_share_down": d["flex_share_down"],
-            "delay_time": math.ceil(d["shifting_duration"]),
-            "shed_time": 1,
-            "recovery_time_shed": 0,
-            "cost_dsm_up": d["variable_costs"] / 2,
-            "cost_dsm_down_shift": d["variable_costs"] / 2,
-            "cost_dsm_down_shed": 10000,
-            "efficiency": 1,
-            "shed_eligibility": False,
-            "shift_eligibility": True,
+            "flex_share_down": 1,  # TODO: Replace hard-coded entries!
+            "delay_time": math.ceil(
+                dr_cluster_data.at[2020, "shifting_duration"]
+            ),
+            "shed_time": math.ceil(
+                dr_cluster_data.at[2020, "interference_duration_pos_shed"]
+            ),
+            "recovery_time_shed": math.ceil(
+                dr_cluster_data.at[2020, "regeneration_duration"]
+            ),
+            "cost_dsm_up": (dr_cluster_data.loc[im.start_year : im.end_year, "variable_costs"] / 2).to_numpy(),
+            "cost_dsm_down_shift": (dr_cluster_data.loc[im.start_year : im.end_year, "variable_costs"] / 2).to_numpy(),
+            "cost_dsm_down_shed": dr_cluster_data.loc[im.start_year : im.end_year, "variable_costs_shed"].to_numpy(),
+            "efficiency": 1,  # TODO: Replace hard-coded entries!
+            "shed_eligibility": eligibility["shedding"],
+            "shift_eligibility": eligibility["shifting"],
         }
 
         # kwargs dependent on demand response modeling approach chosen
         kwargs_dict = {
             "DIW": {
                 "approach": "DIW",
-                "recovery_time_shift": math.ceil(d["regeneration_duration"]),
+                "recovery_time_shift": math.ceil(
+                    dr_cluster_data.at[2020, "regeneration_duration"]
+                ),
             },
             "DLR": {
                 "approach": "DLR",
-                "shift_time": d["interference_duration_pos"],
+                "shift_time": math.ceil(
+                    dr_cluster_data.at[2020, "shifting_duration"]
+                ),
                 "ActivateYearLimit": True,
                 "ActivateDayLimit": False,
                 "n_yearLimit_shift": np.max(
-                    [round(d["maximum_activations_year"]), 1]
+                    [
+                        round(
+                            dr_cluster_data.at[
+                                2020, "maximum_activations_year"
+                            ]
+                        ),
+                        1,
+                    ]
                 ),
-                "n_yearLimit_shed": 1,
+                "n_yearLimit_shed": np.max(
+                    [
+                        round(
+                            dr_cluster_data.at[
+                                2020, "maximum_activations_year"
+                            ]
+                        ),
+                        1,
+                    ]
+                ),
                 "t_dayLimit": 24,
                 "addition": True,
                 "fixes": True,
@@ -439,14 +463,7 @@ def create_demand_response_units(input_data, im, node_dict):
 
         node_dict[i] = approach_dict[im.demand_response_approach]
 
-    # Calculate overall electrical baseline load from demand response units
-    dr_overall_load_ts_df = (
-        input_data["sinks_dr_el_ts"]
-        .mul(input_data["sinks_dr_el"]["max_cap"])
-        .sum(axis=1)
-    )
-
-    return node_dict, dr_overall_load_ts_df
+    return node_dict
 
 
 def create_excess_sinks(input_data, node_dict):
