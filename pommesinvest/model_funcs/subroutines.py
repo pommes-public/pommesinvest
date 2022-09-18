@@ -254,7 +254,7 @@ def create_renewables(input_data, im, node_dict):
     return node_dict
 
 
-def create_demand(input_data, im, node_dict, dr_overall_load_ts_df=None):
+def create_demand(input_data, im, node_dict):
     r"""Create demand sinks and add them to the dict of nodes.
 
     Parameters
@@ -268,12 +268,6 @@ def create_demand(input_data, im, node_dict, dr_overall_load_ts_df=None):
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
-
-    dr_overall_load_ts_df : :class:`pandas.Series`
-        The overall load time series from demand response units which is
-        used to decrement overall electrical load for Germany
-        NOTE: This shall be substituted through a version which already
-        includes this in the data preparation
 
     Returns
     -------
@@ -295,24 +289,6 @@ def create_demand(input_data, im, node_dict, dr_overall_load_ts_df=None):
                 )
             },
         }
-
-        # Adjusted demand here means the difference between overall demand
-        # and the baseline load profile for demand response units
-        if im.activate_demand_response and i == "DE_sink_el_load":
-            kwargs_dict["inputs"] = {
-                node_dict[d["from"]]: solph.flows.Flow(
-                    fix=np.array(
-                        input_data["sinks_demand_el_ts"][i][
-                            im.start_time : im.end_time
-                        ]
-                        .mul(d["maximum"])
-                        .sub(
-                            dr_overall_load_ts_df[im.start_time : im.end_time]
-                        )
-                    ),
-                    nominal_value=1,
-                )
-            }
 
         node_dict[i] = solph.components.Sink(**kwargs_dict)
 

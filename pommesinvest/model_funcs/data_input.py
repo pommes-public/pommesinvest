@@ -88,7 +88,8 @@ def parse_input_data(im):
             f"variable_costs_{im.flexibility_options_scenario}%_nominal"
         ),
         "costs_operation_storages_ts": (
-            f"variable_costs_storages_{im.flexibility_options_scenario}%_nominal"  # noqa: E501
+            f"variable_costs_storages_"
+            f"{im.flexibility_options_scenario}%_nominal"
         ),
         "costs_investment": (
             f"investment_expenses_{im.flexibility_options_scenario}%_nominal"
@@ -119,7 +120,17 @@ def parse_input_data(im):
 
     # Add demand response units
     if im.activate_demand_response:
-        # Obtain clusters from file to avoid hard-coding
+        # Overall demand = overall demand excluding demand response baseline
+        hourly_time_series["sinks_demand_el_ts"] = (
+            f"sinks_demand_el_excl_demand_response_ts_"
+            f"{im.demand_response_scenario}_hourly"
+        )
+        components["sinks_demand_el"] = (
+            f"sinks_demand_el_excl_demand_response_"
+            f"{im.demand_response_scenario}"
+        )
+
+        # Obtain demand response clusters from file to avoid hard-coding
         components[
             "demand_response_clusters_eligibility"
         ] = "demand_response_clusters_eligibility"
@@ -127,27 +138,24 @@ def parse_input_data(im):
             filename="demand_response_clusters_eligibility", im=im
         )
 
-        for dr_cluster in dr_clusters.iterrows():
+        for dr_cluster in dr_clusters.index:
             components[f"sink_dr_el_{dr_cluster}"] = (
                 f"{dr_cluster}_potential_parameters_nominal_"
                 f"{im.demand_response_scenario}%"
             )
 
         components[
-            "sinks_dr_el"
-        ] = f"sinks_demand_response_el_{im.demand_response_scenario}"
-
-        components[
             "sinks_dr_el_ts"
         ] = f"sinks_demand_response_el_ts_{im.demand_response_scenario}"
 
         components["sinks_dr_el_ava_pos_ts"] = (
-            "sinks_demand_response_el_ava_pos_ts_"
-            + im.demand_response_scenario
+            f"sinks_demand_response_el_ava_pos_ts_"
+            f"{im.demand_response_scenario}"
+
         )
         components["sinks_dr_el_ava_neg_ts"] = (
-            "sinks_demand_response_el_ava_neg_ts_"
-            + im.demand_response_scenario
+            f"sinks_demand_response_el_ava_neg_ts_"
+            f"{im.demand_response_scenario}"
         )
 
     # Combine all files
@@ -269,17 +277,12 @@ def add_components(input_data, im):
     node_dict = create_commodity_sources(input_data, im, node_dict)
     node_dict = create_shortage_sources(input_data, node_dict)
     node_dict = create_renewables(input_data, im, node_dict)
+    node_dict = create_demand(input_data, im, node_dict)
 
     if im.activate_demand_response:
-        node_dict, dr_overall_load_ts_df = create_demand_response_units(
+        node_dict = create_demand_response_units(
             input_data, im, node_dict
         )
-
-        node_dict = create_demand(
-            input_data, im, node_dict, dr_overall_load_ts_df
-        )
-    else:
-        node_dict = create_demand(input_data, im, node_dict)
 
     node_dict = create_excess_sinks(input_data, node_dict)
     node_dict = create_exogenous_transformers(input_data, im, node_dict)
