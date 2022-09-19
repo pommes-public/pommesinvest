@@ -323,9 +323,16 @@ def create_demand_response_units(input_data, im, node_dict):
         "demand_response_clusters_eligibility"
     ].iterrows():
         # Introduce shortcut for demand response data set
-        dr_cluster_data = input_data[f"sink_dr_el_{dr_cluster}"]
+        dr_cluster_potential_data = input_data[f"sinks_dr_el_{dr_cluster}"]
+        dr_cluster_variable_costs_data = input_data[
+            f"sinks_dr_el_{dr_cluster}_variable_costs"
+        ]
+        dr_cluster_fixed_costs_and_investments_data = input_data[
+            f"sinks_dr_el_{dr_cluster}_fixed_costs_and_investments"
+        ]
 
         # kwargs for all demand response modeling approaches
+        # for constant values, simply extract 2020 entries from data set
         kwargs_all = {
             "demand": np.array(
                 input_data["sinks_dr_el_ts"][dr_cluster].loc[
@@ -345,17 +352,31 @@ def create_demand_response_units(input_data, im, node_dict):
             ),
             "flex_share_down": 1,  # TODO: Replace hard-coded entries!
             "delay_time": math.ceil(
-                dr_cluster_data.at[2020, "shifting_duration"]
+                dr_cluster_potential_data.at[2020, "shifting_duration"]
             ),
             "shed_time": math.ceil(
-                dr_cluster_data.at[2020, "interference_duration_pos_shed"]
+                dr_cluster_potential_data.at[
+                    2020, "interference_duration_pos_shed"
+                ]
             ),
             "recovery_time_shed": math.ceil(
-                dr_cluster_data.at[2020, "regeneration_duration"]
+                dr_cluster_potential_data.at[2020, "regeneration_duration"]
             ),
-            "cost_dsm_up": (dr_cluster_data.loc[im.start_year : im.end_year, "variable_costs"] / 2).to_numpy(),
-            "cost_dsm_down_shift": (dr_cluster_data.loc[im.start_year : im.end_year, "variable_costs"] / 2).to_numpy(),
-            "cost_dsm_down_shed": dr_cluster_data.loc[im.start_year : im.end_year, "variable_costs_shed"].to_numpy(),
+            "cost_dsm_up": (
+                dr_cluster_variable_costs_data.loc[
+                    im.start_time : im.end_time, "variable_costs"
+                ]
+                / 2
+            ).to_numpy(),
+            "cost_dsm_down_shift": (
+                dr_cluster_variable_costs_data.loc[
+                    im.start_time : im.end_time, "variable_costs"
+                ]
+                / 2
+            ).to_numpy(),
+            "cost_dsm_down_shed": dr_cluster_variable_costs_data.loc[
+                im.start_time : im.end_time, "variable_costs_shed"
+            ].to_numpy(),
             "efficiency": 1,  # TODO: Replace hard-coded entries!
             "shed_eligibility": eligibility["shedding"],
             "shift_eligibility": eligibility["shifting"],
@@ -366,20 +387,20 @@ def create_demand_response_units(input_data, im, node_dict):
             "DIW": {
                 "approach": "DIW",
                 "recovery_time_shift": math.ceil(
-                    dr_cluster_data.at[2020, "regeneration_duration"]
+                    dr_cluster_potential_data.at[2020, "regeneration_duration"]
                 ),
             },
             "DLR": {
                 "approach": "DLR",
                 "shift_time": math.ceil(
-                    dr_cluster_data.at[2020, "shifting_duration"]
+                    dr_cluster_potential_data.at[2020, "shifting_duration"]
                 ),
                 "ActivateYearLimit": True,
                 "ActivateDayLimit": False,
                 "n_yearLimit_shift": np.max(
                     [
                         round(
-                            dr_cluster_data.at[
+                            dr_cluster_potential_data.at[
                                 2020, "maximum_activations_year"
                             ]
                         ),
@@ -389,7 +410,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 "n_yearLimit_shed": np.max(
                     [
                         round(
-                            dr_cluster_data.at[
+                            dr_cluster_potential_data.at[
                                 2020, "maximum_activations_year"
                             ]
                         ),
@@ -403,65 +424,104 @@ def create_demand_response_units(input_data, im, node_dict):
             "oemof": {"approach": "oemof", "shift_interval": 24},
         }
 
+        if "ind" in dr_cluster:
+            dr_kind = "DR_industry"
+        else:
+            dr_kind = "DR_other"
+
+        # Investment limit: (technical) installable capacity
+        # or sum of maximum demand and negative (i.e. upshift) potential
         invest_kwargs = {
             "minimum": 0,
             "maximum": min(
-                d["max_cap"] + d["potential_neg_overall"],
-                d["installed_cap"],
+                dr_cluster_potential_data.loc[int(im.start_year), "max_cap"]
+                + dr_cluster_potential_data.loc[
+                    int(im.start_year), "potential_neg_overall"
+                ],
+                dr_cluster_potential_data.loc[
+                    int(im.start_year), "installed_cap"
+                ],
             ),
             "ep_costs": economics.annuity(
-                # TODO: Add individual entries for investment expenses to data basis
-                capex=input_data["investment_costs"].loc[i, im.start_year],
-                n=d["unit_lifetime"],
-                wacc=input_data["wacc"].loc[i, "wacc in p.u."],
+                capex=dr_cluster_fixed_costs_and_investments_data.loc[
+                    f"{im.start_year}-01-01", "specific_investments"
+                ],
+                n=30,  # TODO: Replace hard-coding!
+                wacc=input_data["wacc"].loc[dr_kind, "wacc in p.u."],
             ),
         }
 
+        # Derive overall maximum from maximum of annual limits for investments
         if im.multi_period:
             invest_kwargs["ep_costs"] = (
-                input_data["investment_costs"].loc[i, im.start_year],
+                dr_cluster_fixed_costs_and_investments_data[
+                    "specific_investments"
+                ]
+                .loc[f"{im.start_year}-01-01":f"{im.end_year}-01-01"]
+                .to_numpy()
             )
             multi_period_invest_kwargs = {
-                "lifetime": d["lifetime"],
+                "lifetime": 30,  # TODO: Replace hard-coding!
                 "age": 0,
-                "interest_rate": d["interest_rate"],
-                "fixed_costs": d["fixed_costs"],
-                "overall_maximum": d["overall_maximum"],
+                "interest_rate": input_data["interest_rate"].loc["value"][0],
+                "fixed_costs": dr_cluster_fixed_costs_and_investments_data[
+                    "fixed_costs"
+                ].to_numpy(),
+                "overall_maximum": max(
+                    min(
+                        dr_cluster_potential_data.loc[iter_year, "max_cap"]
+                        + dr_cluster_potential_data.loc[
+                            iter_year, "potential_neg_overall"
+                        ],
+                        dr_cluster_potential_data.loc[
+                            iter_year, "installed_cap"
+                        ],
+                    )
+                    for iter_year in range(
+                        int(im.start_year), int(im.end_year) + 1
+                    )
+                ),
             }
             invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
 
         # TODO: Critically check min and max invest params
         approach_dict = {
             "DLR": solph.components.experimental.SinkDSM(
-                label=i,
+                label=dr_cluster,
                 inputs={
-                    node_dict[d["from"]]: solph.flows.Flow(variable_costs=0)
+                    node_dict[
+                        dr_cluster_potential_data.at[2020, "from"]
+                    ]: solph.flows.Flow(variable_costs=0)
                 },
                 **kwargs_all,
                 **kwargs_dict["DLR"],
-                invest=solph.Investment(**invest_kwargs),
+                investment=solph.Investment(**invest_kwargs),
             ),
             "DIW": solph.components.experimental.SinkDSM(
-                label=i,
+                label=dr_cluster,
                 inputs={
-                    node_dict[d["from"]]: solph.flows.Flow(variable_costs=0)
+                    node_dict[
+                        dr_cluster_potential_data.at[2020, "from"]
+                    ]: solph.flows.Flow(variable_costs=0)
                 },
                 **kwargs_all,
                 **kwargs_dict["DIW"],
-                invest=solph.Investment(**invest_kwargs),
+                investment=solph.Investment(**invest_kwargs),
             ),
             "oemof": solph.components.experimental.SinkDSM(
-                label=i,
+                label=dr_cluster,
                 inputs={
-                    node_dict[d["from"]]: solph.flows.Flow(variable_costs=0)
+                    node_dict[
+                        dr_cluster_potential_data.at[2020, "from"]
+                    ]: solph.flows.Flow(variable_costs=0)
                 },
                 **kwargs_all,
                 **kwargs_dict["oemof"],
-                invest=solph.Investment(**invest_kwargs),
+                investment=solph.Investment(**invest_kwargs),
             ),
         }
 
-        node_dict[i] = approach_dict[im.demand_response_approach]
+        node_dict[dr_cluster] = approach_dict[im.demand_response_approach]
 
     return node_dict
 

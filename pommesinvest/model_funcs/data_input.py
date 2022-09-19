@@ -15,6 +15,7 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 
 (*) Corresponding authors
 """
+
 import numpy as np
 import pandas as pd
 
@@ -139,21 +140,30 @@ def parse_input_data(im):
         )
 
         for dr_cluster in dr_clusters.index:
-            components[f"sink_dr_el_{dr_cluster}"] = (
-                f"{dr_cluster}_potential_parameters_nominal_"
+            components[f"sinks_dr_el_{dr_cluster}"] = (
+                f"{dr_cluster}_potential_parameters_"
                 f"{im.demand_response_scenario}%"
             )
+            annual_time_series[f"sinks_dr_el_{dr_cluster}_variable_costs"] = (
+                f"{dr_cluster}_variable_costs_parameters_"
+                f"{im.demand_response_scenario}%"
+            )
+            annual_time_series[
+                f"sinks_dr_el_{dr_cluster}_fixed_costs_and_investments"
+            ] = (
+                f"{dr_cluster}_fixed_costs_and_investments_"
+                f"parameters_{im.demand_response_scenario}%"
+            )
 
-        components[
+        hourly_time_series[
             "sinks_dr_el_ts"
         ] = f"sinks_demand_response_el_ts_{im.demand_response_scenario}"
 
-        components["sinks_dr_el_ava_pos_ts"] = (
+        hourly_time_series["sinks_dr_el_ava_pos_ts"] = (
             f"sinks_demand_response_el_ava_pos_ts_"
             f"{im.demand_response_scenario}"
-
         )
-        components["sinks_dr_el_ava_neg_ts"] = (
+        hourly_time_series["sinks_dr_el_ava_neg_ts"] = (
             f"sinks_demand_response_el_ava_neg_ts_"
             f"{im.demand_response_scenario}"
         )
@@ -222,6 +232,31 @@ def resample_input_data(input_data, im):
         "initial_storage_level",
     ]
 
+    # Integrate demand response in resampling activities
+    if im.activate_demand_response:
+        demand_response_potential_data = []
+        for dr_cluster in input_data[
+            "demand_response_clusters_eligibility"
+        ].index:
+            annual_ts.append(f"sinks_dr_el_{dr_cluster}_variable_costs")
+            demand_response_potential_data.append(f"sinks_dr_el_{dr_cluster}")
+        hourly_ts.extend(
+            [
+                "sinks_dr_el_ts",
+                "sinks_dr_el_ava_pos_ts",
+                "sinks_dr_el_ava_neg_ts",
+            ]
+        )
+        demand_response_potential_columns = [
+            "interference_duration_neg",
+            "interference_duration_pos",
+            "interference_duration_pos_shed",
+            "maximum_activations_year",
+            "maximum_activations_year_shed",
+            "regeneration_duration",
+            "shifting_duration",
+        ]
+
     for key in input_data.keys():
         if key in transformer_data:
             input_data[key].loc[:, transformer_columns] = (
@@ -238,6 +273,18 @@ def resample_input_data(input_data, im):
             if not "new_built" in key:
                 for col in existing_storages_add_columns:
                     storages_columns.remove(col)
+        # Note: The scaling down here may result in very unprecise results!
+        elif (
+            im.activate_demand_response
+            and key in demand_response_potential_data
+        ):
+            input_data[key].loc[
+                :, demand_response_potential_columns
+            ] = np.ceil(
+                input_data[key]
+                .loc[:, demand_response_potential_columns]
+                .div(im.multiplier)
+            )
         elif key in annual_ts:
             input_data[key].loc["2051-01-01"] = input_data[key].loc[
                 "2050-01-01"
@@ -280,9 +327,7 @@ def add_components(input_data, im):
     node_dict = create_demand(input_data, im, node_dict)
 
     if im.activate_demand_response:
-        node_dict = create_demand_response_units(
-            input_data, im, node_dict
-        )
+        node_dict = create_demand_response_units(input_data, im, node_dict)
 
     node_dict = create_excess_sinks(input_data, node_dict)
     node_dict = create_exogenous_transformers(input_data, im, node_dict)
