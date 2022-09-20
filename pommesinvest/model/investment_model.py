@@ -51,9 +51,9 @@ Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 import argparse
 import logging
 import time
-import yaml
 
 import pandas as pd
+import yaml
 from oemof.solph import processing
 from oemof.solph import views
 from yaml.loader import SafeLoader
@@ -170,6 +170,22 @@ def run_investment_model(config_file="./config.yml"):
         investment_results = views.node(model_results, "DE_bus_el")[
             "period_scalars"
         ]
+
+        if im.activate_demand_response:
+            investments_to_concat = [investment_results]
+            dispatch_to_concat = [dispatch_results]
+            for cluster in im.demand_response_clusters:
+                investments_to_concat.append(
+                    views.node(model_results, cluster)["period_scalars"]
+                )
+                processed_demand_response_results = (
+                    process_demand_response_results(
+                        views.node(model_results, cluster)["sequences"]
+                    )
+                )
+                dispatch_to_concat.append(processed_demand_response_results)
+            investment_results = pd.concat(investments_to_concat)
+            dispatch_results = pd.concat(dispatch_to_concat, axis=1)
 
     if im.save_investment_results:
         investment_results.to_csv(

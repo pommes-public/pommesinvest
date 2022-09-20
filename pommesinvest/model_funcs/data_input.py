@@ -138,7 +138,8 @@ def parse_input_data(im):
         dr_clusters = load_input_data(
             filename="demand_response_clusters_eligibility", im=im
         )
-
+        # Add demand response clusters information to model itself
+        im.add_demand_response_clusters(list(dr_clusters.index))
         for dr_cluster in dr_clusters.index:
             components[f"sinks_dr_el_{dr_cluster}"] = (
                 f"{dr_cluster}_potential_parameters_"

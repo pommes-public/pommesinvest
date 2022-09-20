@@ -20,6 +20,7 @@ import logging
 import math
 
 import oemof.solph as solph
+import pandas as pd
 
 # constraints, views, models, network, processing
 from oemof.tools import logger
@@ -29,8 +30,6 @@ from pommesinvest.model_funcs.data_input import (
     nodes_from_csv,
     nodes_from_csv_myopic_horizon,
 )
-
-import pandas as pd
 
 
 def show_meta_logging_info(model_meta):
@@ -244,6 +243,9 @@ class InvestmentModel(object):
     overlap_in_time_steps : int (optional, for myopic horizon)
         The length of the overlap for a myopic horizon model run in hours;
         defaults to 0 for a regular, i.e. non-myopic model
+
+    demand_response_clusters : list (optional, only for demand response)
+        A list specifying the names of the demand response clusters introduced
     """  # noqa: E501
 
     def __init__(self):
@@ -419,6 +421,16 @@ class InvestmentModel(object):
                 / getattr(self, "time_slice_length_wo_overlap_in_time_steps")
             ),
         )
+
+    def add_demand_response_clusters(self, demand_response_clusters):
+        """Append the information on demand response clusters to the model
+
+        Parameters
+        ----------
+        demand_response_clusters : list
+            Demand response clusters to be considered
+        """
+        setattr(self, "demand_response_clusters", demand_response_clusters)
 
     def initialize_logging(self):
         """Initialize logging by deriving a filename from the configuration"""
