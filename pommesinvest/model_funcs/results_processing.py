@@ -55,3 +55,22 @@ def process_demand_response_results(results):
     ).cumsum()
 
     return processed_results
+
+
+def filter_storage_results(results):
+    """Filter the given storage results to isolate storage capacities
+
+    Parameters
+    ----------
+    results : pd.DataFrame
+        The raw storage results
+
+    Returns
+    -------
+    filtered_results : pd.DataFrame
+        Storage capacity results
+    """
+    capacity_idx = [idx for idx in results.index if idx[0][1] == "None"]
+    filtered_results = results.loc[capacity_idx]
+
+    return filtered_results

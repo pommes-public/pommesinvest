@@ -59,6 +59,9 @@ from oemof.solph import views
 from yaml.loader import SafeLoader
 
 from pommesinvest.model_funcs import model_control
+from pommesinvest.model_funcs.results_processing import (
+    process_demand_response_results, filter_storage_results,
+)
 
 
 def run_investment_model(config_file="./config.yml"):
@@ -171,8 +174,15 @@ def run_investment_model(config_file="./config.yml"):
             "period_scalars"
         ]
 
+        investments_to_concat = [investment_results]
+
+        for storage in im.new_built_storages:
+            filtered_storage_results = filter_storage_results(
+                views.node(model_results, storage)["period_scalars"]
+            )
+            investments_to_concat.append(filtered_storage_results)
+
         if im.activate_demand_response:
-            investments_to_concat = [investment_results]
             dispatch_to_concat = [dispatch_results]
             for cluster in im.demand_response_clusters:
                 investments_to_concat.append(
@@ -184,8 +194,9 @@ def run_investment_model(config_file="./config.yml"):
                     )
                 )
                 dispatch_to_concat.append(processed_demand_response_results)
-            investment_results = pd.concat(investments_to_concat)
             dispatch_results = pd.concat(dispatch_to_concat, axis=1)
+
+        investment_results = pd.concat(investments_to_concat)
 
     if im.save_investment_results:
         investment_results.to_csv(

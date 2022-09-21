@@ -244,6 +244,9 @@ class InvestmentModel(object):
         The length of the overlap for a myopic horizon model run in hours;
         defaults to 0 for a regular, i.e. non-myopic model
 
+    new_built_storages : list
+        A list specifying all potentially new-built storages
+
     demand_response_clusters : list (optional, only for demand response)
         A list specifying the names of the demand response clusters introduced
     """  # noqa: E501
@@ -432,6 +435,16 @@ class InvestmentModel(object):
         """
         setattr(self, "demand_response_clusters", demand_response_clusters)
 
+    def add_new_built_storages(self, new_built_storages):
+        """Append the information on new-built storage units to the model
+
+        Parameters
+        ----------
+        new_built_storages : list
+            Potentially new-built storage units
+        """
+        setattr(self, "new_built_storages", new_built_storages)
+
     def initialize_logging(self):
         """Initialize logging by deriving a filename from the configuration"""
         setattr(
@@ -441,17 +454,13 @@ class InvestmentModel(object):
         )
 
         if not self.myopic_horizon:
-            rh = "simple_"
+            rh = "simple"
         else:
-            rh = "RH_"
+            rh = "RH"
 
         filename = (
-            "investment_LP_start-"
-            + self.start_time[:10]
-            + "_"
-            + str(self.optimization_timeframe)
-            + "-years_"
-            + rh
+            f"investment_LP_start-{self.start_time[:10]}_"
+            f"{self.optimization_timeframe}-years_{rh}_freq_{self.freq}"
         )
 
         setattr(self, "filename", filename)

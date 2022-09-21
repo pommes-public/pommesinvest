@@ -138,7 +138,7 @@ def parse_input_data(im):
         dr_clusters = load_input_data(
             filename="demand_response_clusters_eligibility", im=im
         )
-        # Add demand response clusters information to model itself
+        # Add demand response clusters information to the model itself
         im.add_demand_response_clusters(list(dr_clusters.index))
         for dr_cluster in dr_clusters.index:
             components[f"sinks_dr_el_{dr_cluster}"] = (
@@ -355,6 +355,9 @@ def nodes_from_csv(im):
     """
     input_data = parse_input_data(im)
     resample_input_data(input_data, im)
+
+    # Add new-built storages information to the model itself
+    im.add_new_built_storages(list(input_data["new_built_storages_el"].index))
 
     node_dict = add_components(input_data, im)
 
