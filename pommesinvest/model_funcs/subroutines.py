@@ -344,13 +344,16 @@ def create_demand_response_units(input_data, im, node_dict):
                     im.start_time : im.end_time
                 ]
             ),
-            "flex_share_up": 1,  # TODO: Replace hard-coded entries!
             "capacity_down": np.array(
                 input_data["sinks_dr_el_ava_pos_ts"][dr_cluster].loc[
                     im.start_time : im.end_time
                 ]
             ),
-            "flex_share_down": 1,  # TODO: Replace hard-coded entries!
+            "max_demand": np.array(
+                dr_cluster_potential_data.loc[
+                    im.start_year : im.end_year, "max_cap"
+                ]
+            ),
             "delay_time": math.ceil(
                 dr_cluster_potential_data.at[2020, "shifting_duration"]
             ),
@@ -429,18 +432,20 @@ def create_demand_response_units(input_data, im, node_dict):
         else:
             dr_kind = "DR_other"
 
-        # Investment limit: (technical) installable capacity
-        # or sum of maximum demand and negative (i.e. upshift) potential
+        # Investment limit: maximum of positive (i.e. downshift)
+        # and negative (i.e. upshift) potential
         invest_kwargs = {
             "minimum": 0,
             "maximum": min(
-                dr_cluster_potential_data.loc[int(im.start_year), "max_cap"]
-                + dr_cluster_potential_data.loc[
-                    int(im.start_year), "potential_neg_overall"
-                ],
-                dr_cluster_potential_data.loc[
-                    int(im.start_year), "installed_cap"
-                ],
+                max(
+                    dr_cluster_potential_data.loc[
+                        int(im.start_year), "potential_pos_overall"
+                    ],
+                    dr_cluster_potential_data.loc[
+                        int(im.start_year), "potential_neg_overall"
+                    ],
+                ),
+                dr_cluster_potential_data.loc[int(im.start_year), "max_cap"],
             ),
             "ep_costs": economics.annuity(
                 capex=dr_cluster_fixed_costs_and_investments_data.loc[
@@ -469,13 +474,15 @@ def create_demand_response_units(input_data, im, node_dict):
                 ].to_numpy(),
                 "overall_maximum": max(
                     min(
-                        dr_cluster_potential_data.loc[iter_year, "max_cap"]
-                        + dr_cluster_potential_data.loc[
-                            iter_year, "potential_neg_overall"
-                        ],
-                        dr_cluster_potential_data.loc[
-                            iter_year, "installed_cap"
-                        ],
+                        max(
+                            dr_cluster_potential_data.loc[
+                                iter_year, "potential_pos_overall"
+                            ],
+                            dr_cluster_potential_data.loc[
+                                iter_year, "potential_neg_overall"
+                            ],
+                        ),
+                        dr_cluster_potential_data.loc[iter_year, "max_cap"],
                     )
                     for iter_year in range(
                         int(im.start_year), int(im.end_year) + 1
