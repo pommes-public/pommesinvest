@@ -9,3 +9,4 @@ dependencies:
   - pip:
       # TODO: Replace with release when available
       - git+https://github.com/oemof/oemof-solph.git@features/multi-period
+      - pyyaml
