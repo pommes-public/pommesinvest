@@ -458,6 +458,23 @@ def create_demand_response_units(input_data, im, node_dict):
 
         # Derive overall maximum from maximum of annual limits for investments
         if im.multi_period:
+            annual_maximum = [
+                min(
+                    max(
+                        dr_cluster_potential_data.loc[
+                            iter_year, "potential_pos_overall"
+                        ],
+                        dr_cluster_potential_data.loc[
+                            iter_year, "potential_neg_overall"
+                        ],
+                    ),
+                    dr_cluster_potential_data.loc[iter_year, "max_cap"],
+                )
+                for iter_year in range(
+                    int(im.start_year), int(im.end_year) + 1
+                )
+            ]
+
             invest_kwargs["ep_costs"] = (
                 dr_cluster_fixed_costs_and_investments_data[
                     "specific_investments"
@@ -472,22 +489,8 @@ def create_demand_response_units(input_data, im, node_dict):
                 "fixed_costs": dr_cluster_fixed_costs_and_investments_data[
                     "fixed_costs"
                 ].to_numpy(),
-                "overall_maximum": max(
-                    min(
-                        max(
-                            dr_cluster_potential_data.loc[
-                                iter_year, "potential_pos_overall"
-                            ],
-                            dr_cluster_potential_data.loc[
-                                iter_year, "potential_neg_overall"
-                            ],
-                        ),
-                        dr_cluster_potential_data.loc[iter_year, "max_cap"],
-                    )
-                    for iter_year in range(
-                        int(im.start_year), int(im.end_year) + 1
-                    )
-                ),
+                "maximum": annual_maximum,
+                "overall_maximum": max(annual_maximum),
             }
             invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
 
