@@ -119,6 +119,15 @@ def parse_input_data(im):
         "hydrogen_investment_maxima": "hydrogen_investment_maxima",
     }
 
+    # Development factors for emissions; used for scaling minimum loads
+    if (
+        im.activate_emissions_pathway_limit
+        or im.activate_emissions_budget_limit
+    ):
+        other_files[
+            "emission_development_factors"
+        ] = "emission_development_factors"
+
     # Add demand response units
     if im.activate_demand_response:
         # Overall demand = overall demand excluding demand response baseline
@@ -257,6 +266,10 @@ def resample_input_data(input_data, im):
             "regeneration_duration",
             "shifting_duration",
         ]
+
+    # Development factors for emissions; used for scaling minimum loads
+    if im.activate_emissions_pathway_limit:
+        annual_ts.append("emission_development_factors")
 
     for key in input_data.keys():
         if key in transformer_data:

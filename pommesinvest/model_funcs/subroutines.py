@@ -694,6 +694,24 @@ def create_exogenous_transformers(
                 .to_numpy()
             )
 
+        # HACK: Reduce minimum output in order not to exceed emissions caps
+        # TODO: Find out why "real" emissions seem so far off limit and adjust
+        multiplier = 1
+        if im.activate_emissions_budget_limit:
+            multiplier = 0.2
+            multiplier *= (
+                input_data["emission_development_factors"]
+                .loc[im.start_year : im.end_year, im.emissions_pathway]
+                .mean()
+            )
+        if im.activate_emissions_pathway_limit:
+            multiplier = 0.2
+            multiplier *= (
+                input_data["emission_development_factors"].loc[
+                    im.start_time : im.end_time, im.emissions_pathway
+                ]
+            ).values
+
         # Correct minimum load by maximum capacities of particular time
         outflow_args_el["min"] *= (
             input_data["transformers_exogenous_max_ts"]
@@ -702,6 +720,8 @@ def create_exogenous_transformers(
                 i,
             ]
             .to_numpy()
+            # HACK: Reduce minimum loads not to exceed emissions caps
+            * multiplier
         )
 
         node_dict[i] = build_condensing_transformer(
