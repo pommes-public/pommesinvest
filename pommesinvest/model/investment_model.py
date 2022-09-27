@@ -128,10 +128,10 @@ def run_investment_model(config_file="./config.yml"):
             solve_kwargs={"tee": True},
             cmdline_options={
                 "lpmethod": 4,
-                "predual": -1,
+                "preprocessing dual": -1,
                 "solutiontype": 2,
                 "threads": 12,
-                "barepcomp": 1e-6,
+                "barrier convergetol": 1e-6,
             },
         )
         meta_results = processing.meta_results(im.om)
