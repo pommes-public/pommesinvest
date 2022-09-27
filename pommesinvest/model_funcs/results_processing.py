@@ -19,15 +19,15 @@ def process_demand_response_results(results):
     upshift_columns = [
         col
         for col in results.columns
-        if "dsm_up" in col[1]
-        and not "balance" in col[1]
+        if ("dsm_up" in col[1]
+        and not "balance" in col[1])
         or "balance_dsm_do" in col
     ]
     downshift_columns = [
         col
         for col in results.columns
-        if "dsm_do_shift" in col[1]
-        and not "balance" in col[1]
+        if ("dsm_do_shift" in col[1]
+        and not "balance" in col[1])
         or "balance_dsm_up" in col
     ]
     shedding_columns = [

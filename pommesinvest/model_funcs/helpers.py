@@ -195,7 +195,42 @@ def resample_timeseries(
             method=interpolation_rule
         )
 
+    cut_leap_days(resampled_timeseries)
+
     return resampled_timeseries
+
+
+def cut_leap_days(time_series):
+    """Take a time series index with real dates and cut the leap days out
+
+    Actual time stamps cannot be interpreted. Instead consider 8760 hours
+    of a synthetical year
+
+    Parameters
+    ----------
+    time_series : pd.Series or pd.DataFrame
+        original time series with real life time index
+
+    Returns
+    -------
+    time_series : pd.Series or pd.DataFrame
+        Time series, simply cutted down to 8 760 hours per year
+    """
+    years = sorted(list(set(getattr(time_series.index, "year"))))
+    for year in years:
+        if is_leap_year(year):
+            try:
+                time_series.drop(
+                        time_series.loc[
+                            (time_series.index.year == year)
+                            & (time_series.index.month == 12)
+                            & (time_series.index.day == 31)
+                        ].index, inplace=True
+                )
+            except KeyError:
+                continue
+
+    return time_series
 
 
 def convert_annual_limit(annual_limit, start_time, end_time):

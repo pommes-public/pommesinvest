@@ -30,6 +30,7 @@ from pommesinvest.model_funcs.data_input import (
     nodes_from_csv,
     nodes_from_csv_myopic_horizon,
 )
+from pommesinvest.model_funcs.helpers import is_leap_year
 
 
 def show_meta_logging_info(model_meta):
@@ -42,6 +43,28 @@ def show_meta_logging_info(model_meta):
         f"Overall solution time: {model_meta['overall_solution_time']:.2f}"
     )
     logging.info(f"Overall time: {model_meta['overall_time']:.2f}")
+
+
+def adjust_datetime_index(periods):
+    """Create a datetime index ignoring the leap days
+
+    Parameters
+    ----------
+    periods : dict
+        pd.date_ranges defining the time stamps for the respective period,
+        starting with period 0
+
+    Returns
+    -------
+    datetime_index : pd.date_range
+        Actual datetime index of the model ignoring leap days
+    """
+    datetime_index = periods[0]
+    for period, timeindex in periods.items():
+        if period >= 1:
+            datetime_index = datetime_index.append(timeindex)
+
+    return datetime_index
 
 
 class InvestmentModel(object):
@@ -498,12 +521,16 @@ class InvestmentModel(object):
         datetime_index = pd.date_range(
             self.start_time, self.end_time, freq=self.freq
         )
-        # TODO: Explicitly define periods or change
-        #  from hourly frequency as a default
+        periods = None
+        if self.freq != "48H":
+            periods = self.determine_periods(datetime_index)
+            datetime_index = adjust_datetime_index(periods)
+
         if self.multi_period:
             es = solph.EnergySystem(
                 timeindex=datetime_index,
                 timeincrement=[self.multiplier] * len(datetime_index),
+                periods=periods,
                 freq=self.freq,
                 multi_period=True,
                 infer_last_interval=False,
@@ -588,6 +615,41 @@ class InvestmentModel(object):
                 f"Introducing an EMISSIONS PATHWAY LIMIT using pathway "
                 f"{self.emissions_pathway}."
             )
+
+    def determine_periods(self, datetimeindex):
+        """Explicitly define and return periods of the energy system
+
+        Ignore leap years, i.e. treat them as if they had 8 760 hours as well.
+        The remainder is the same as oemof.solph._energy_system._add_periods().
+
+        Parameters
+        ----------
+        datetimeindex : pd.date_range
+            DatetimeIndex of the model comprising all time steps
+
+        Returns
+        -------
+        periods : dict
+            pd.date_ranges defining the time stamps for the respective period,
+            starting with period 0
+        """
+        years = sorted(list(set(getattr(datetimeindex, "year"))))
+        periods = {}
+        filter_series = datetimeindex.to_series()
+        for number, year in enumerate(years):
+            start = filter_series.loc[filter_series.index.year == year].min()
+            if not is_leap_year(year):
+                end = filter_series.loc[filter_series.index.year == year].max()
+            else:
+                # Exclude last day / resp. leap day
+                end = filter_series.loc[
+                    (filter_series.index.year == year)
+                    & (filter_series.index.month == 12)
+                    & (filter_series.index.day != 31)
+                ].max()
+            periods[number] = pd.date_range(start, end, freq=self.freq)
+
+        return periods
 
     def build_myopic_horizon_model(self, counter, iteration_results):
         r"""Set up and return a myopic horizon LP dispatch model
