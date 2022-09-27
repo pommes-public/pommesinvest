@@ -60,7 +60,8 @@ from yaml.loader import SafeLoader
 
 from pommesinvest.model_funcs import model_control
 from pommesinvest.model_funcs.results_processing import (
-    process_demand_response_results, filter_storage_results,
+    process_demand_response_results,
+    filter_storage_results,
 )
 
 
@@ -122,7 +123,17 @@ def run_investment_model(config_file="./config.yml"):
                 io_options={"symbolic_solver_labels": True},
             )
 
-        im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
+        im.om.solve(
+            solver=im.solver,
+            solve_kwargs={"tee": True},
+            cmdline_options={
+                "lpmethod": 4,
+                "predual": -1,
+                "solutiontype": 2,
+                "threads": 12,
+                "barepcomp": 1e-6,
+            },
+        )
         meta_results = processing.meta_results(im.om)
 
         model_meta["overall_objective"] = meta_results["objective"]
