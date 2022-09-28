@@ -480,10 +480,15 @@ class InvestmentModel(object):
             rh = "simple"
         else:
             rh = "RH"
+        if not self.activate_demand_response:
+            dr = "no_dr"
+        else:
+            dr = "with_dr"
 
         filename = (
             f"investment_LP_start-{self.start_time[:10]}_"
-            f"{self.optimization_timeframe}-years_{rh}_freq_{self.freq}"
+            f"{self.optimization_timeframe}-years_{rh}_freq_{self.freq}_"
+            f"{dr}_{self.demand_response_scenario}"
         )
 
         setattr(self, "filename", filename)
