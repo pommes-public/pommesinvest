@@ -10,12 +10,34 @@ control_parameters:
     myopic_horizon: False
     aggregate_input: False
     interest_rate: 0.02
+    countries:
+    [
+        "AT",
+        "BE",
+        "CH",
+        "CZ",
+        "DE",
+        "DK1",
+        "DK2",
+        "FR",
+        "NL",
+        "NO1",
+        "NO2",
+        "NO3",
+        "NO4",
+        "NO5",
+        "PL",
+        "SE1",
+        "SE2",
+        "SE3",
+        "SE4",
+    ]
     solver: "gurobi"
     fuel_cost_pathway: "NZE"
+    fuel_price_shock: "high"
     emissions_cost_pathway: "long-term"
-    investment_cost_pathway: "50"
+    flexibility_options_scenario: "50"
     activate_emissions_budget_limit: False
-    emissions_budget_limit: 1000000
     activate_emissions_pathway_limit: True
     emissions_pathway: "KNS_2035"
     activate_demand_response: False

@@ -184,8 +184,14 @@ def run_investment_model(config_file="./config.yml"):
         investment_results = views.node(model_results, "DE_bus_el")[
             "period_scalars"
         ]
+        electrolyzer_investment_results = views.node(
+            model_results, "DE_bus_hydrogen"
+        )["period_scalars"]
 
-        investments_to_concat = [investment_results]
+        investments_to_concat = [
+            investment_results,
+            electrolyzer_investment_results,
+        ]
 
         for storage in im.new_built_storages:
             filtered_storage_results = filter_storage_results(

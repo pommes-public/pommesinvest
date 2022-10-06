@@ -85,6 +85,9 @@ class InvestmentModel(object):
     interest_rate : float
         Interest rate used for discounting
 
+    countries : list of str
+        List of countries to be simulated
+
     solver : str
         The solver to be used for solving the mathematical optimization model.
         Must be one of the solvers oemof.solph resp. pyomo support, e.g.
