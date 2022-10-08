@@ -132,7 +132,6 @@ def create_buses(input_data, node_dict):
     return node_dict
 
 
-# TODO: Provide (annual) cost input data in the neccessary format (2020 = 1.0)
 def create_commodity_sources(input_data, im, node_dict):
     r"""Create commodity sources and add them to the dict of nodes.
 
@@ -164,8 +163,6 @@ def create_commodity_sources(input_data, im, node_dict):
                         input_data["costs_fuel_ts"]
                         .loc[im.start_time : im.end_time, i]
                         .to_numpy()
-                        # TODO: Decide on whether or not to keep emission
-                        #  costs out / endogenously determined
                         + input_data["costs_emissions_ts"]
                         .loc[im.start_time : im.end_time, i]
                         .to_numpy()
