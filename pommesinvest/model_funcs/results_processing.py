@@ -19,16 +19,22 @@ def process_demand_response_results(results):
     upshift_columns = [
         col
         for col in results.columns
-        if ("dsm_up" in col[1]
-        and not "balance" in col[1])
-        or "balance_dsm_do" in col
+        if (
+            "dsm_up" in col[1]
+            and "balance" not in col[1]
+            and "level" not in col[1]
+        )
+        or ("balance_dsm_do" in col)
     ]
     downshift_columns = [
         col
         for col in results.columns
-        if ("dsm_do_shift" in col[1]
-        and not "balance" in col[1])
-        or "balance_dsm_up" in col
+        if (
+            "dsm_do_shift" in col[1]
+            and "balance" not in col[1]
+            and "level" not in col[1]
+        )
+        or ("balance_dsm_up" in col)
     ]
     shedding_columns = [
         col for col in results.columns if "dsm_do_shed" in col[1]
@@ -40,15 +46,15 @@ def process_demand_response_results(results):
 
     # Only upshift, downshift, shedding and storage level are required
     # Inflow is already considered in dispatch results
-    processed_results[(cluster_identifier, "dsm_up")] = (
-        results[upshift_columns].sum(axis=1)
-    )
-    processed_results[(cluster_identifier, "dsm_do_shift")] = (
-        results[downshift_columns].sum(axis=1)
-    )
-    processed_results[(cluster_identifier, "dsm_do_shed")] = (
-        results[shedding_columns].sum(axis=1)
-    )
+    processed_results[(cluster_identifier, "dsm_up")] = results[
+        upshift_columns
+    ].sum(axis=1)
+    processed_results[(cluster_identifier, "dsm_do_shift")] = results[
+        downshift_columns
+    ].sum(axis=1)
+    processed_results[(cluster_identifier, "dsm_do_shed")] = results[
+        shedding_columns
+    ].sum(axis=1)
     processed_results[(cluster_identifier, "dsm_storage_level")] = (
         processed_results[(cluster_identifier, "dsm_do_shift")]
         - processed_results[(cluster_identifier, "dsm_up")]
