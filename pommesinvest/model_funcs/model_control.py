@@ -93,6 +93,9 @@ class InvestmentModel(object):
         Must be one of the solvers oemof.solph resp. pyomo support, e.g.
         'cbc', 'gplk', 'gurobi', 'cplex'.
 
+    solver_commandline_options: bool
+        If True, use solver command line option; If False, use solver defaults
+
     fuel_cost_pathway :  str
         A predefined pathway for commodity cost development until 2050
 
@@ -284,6 +287,7 @@ class InvestmentModel(object):
         self.interest_rate = None
         self.countries = None
         self.solver = None
+        self.solver_commandline_options = None
         self.fuel_cost_pathway = None
         self.fuel_price_shock = None
         self.emissions_cost_pathway = None
