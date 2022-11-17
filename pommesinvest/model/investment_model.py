@@ -122,18 +122,20 @@ def run_investment_model(config_file="./config.yml"):
                 f"{im.path_folder_output}pommesinvest_model.lp",
                 io_options={"symbolic_solver_labels": True},
             )
-
-        im.om.solve(
-            solver=im.solver,
-            solve_kwargs={"tee": True},
-            cmdline_options={
-                "lpmethod": 4,
-                "preprocessing dual": -1,
-                "solutiontype": 2,
-                "threads": 12,
-                "barrier convergetol": 1e-6,
-            },
-        )
+        if im.solver_commandline_options:
+            logging.info(
+                "Using solver command line options.\n"
+                "Ensure that these are the correct ones for your solver of "
+                "choice since otherwise, this might lead to "
+                "the solver to run into an Error."
+            )
+            im.om.solve(
+                solver=im.solver,
+                solve_kwargs={"tee": True},
+                cmdline_options=config["solver_cmdline_options"],
+            )
+        else:
+            im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
         meta_results = processing.meta_results(im.om)
 
         model_meta["overall_objective"] = meta_results["objective"]

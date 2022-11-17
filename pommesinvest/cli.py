@@ -33,6 +33,7 @@ control_parameters:
         "SE4",
     ]
     solver: "gurobi"
+    solver_commandline_options: False
     fuel_cost_pathway: "NZE"
     fuel_price_shock: "high"
     emissions_cost_pathway: "long-term"
@@ -62,7 +63,15 @@ input_output_parameters:
 # 4) Set myopic horizon parameters (optional)
 myopic_horizon_parameters:
     myopic_horizon_in_years: 4
-    overlap_in_years: 0"""
+    overlap_in_years: 0
+    
+# 5) Set solver command line options (optional)
+solver_cmdline_options:
+    lpmethod: 4
+    preprocessing dual: -1
+    solutiontype: 2
+    threads: 12
+    barrier convergetol: 1.0e-6"""
     with open("./config.yml", "w") as opf:
         opf.write(content)
 
