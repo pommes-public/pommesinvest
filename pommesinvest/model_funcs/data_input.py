@@ -35,7 +35,7 @@ from pommesinvest.model_funcs.subroutines import (
     create_new_built_transformers_myopic_horizon,
     create_renewables,
     create_shortage_sources,
-    load_input_data,
+    load_input_data, create_linking_transformers,
 )
 
 
@@ -74,6 +74,7 @@ def parse_input_data(im):
         "sources_renewables_ts": "sources_renewables_ts_hourly",
         "transformers_minload_ts": "transformers_minload_ts_hourly",
         "transformers_availability_ts": "transformers_availability_ts_hourly",
+        "linking_transformers_ts": "linking_transformers_ts",
     }
 
     annual_time_series = {
@@ -103,6 +104,7 @@ def parse_input_data(im):
             f"investment_expenses_storages_power_"
             + f"{im.flexibility_options_scenario}%_nominal"
         ),
+        "linking_transformers_annual_ts": "linking_transformers_annual_ts",
     }
 
     # Time-invariant data sets
@@ -117,6 +119,7 @@ def parse_input_data(im):
             f"fixed_costs_storages_{im.flexibility_options_scenario}%_nominal"
         ),
         "hydrogen_investment_maxima": "hydrogen_investment_maxima",
+        "linking_transformers": "linking_transformers",
     }
 
     # Development factors for emissions; used for scaling minimum loads
@@ -217,12 +220,14 @@ def resample_input_data(input_data, im):
         "costs_emissions_ts",
         "costs_operation_ts",
         "costs_operation_storages_ts",
+        "linking_transformers_annual_ts",
     ]
     hourly_ts = [
         "sinks_demand_el_ts",
         "sources_renewables_ts",
         "transformers_minload_ts",
         "transformers_availability_ts",
+        "linking_transformers_ts",
     ]
 
     transformer_columns = [
@@ -336,6 +341,8 @@ def add_components(input_data, im):
     node_dict = {}
     node_dict = create_buses(input_data, node_dict)
     node_dict = create_commodity_sources(input_data, im, node_dict)
+    if im.countries != ["DE"]:
+        node_dict = create_linking_transformers(input_data, im, node_dict)
     node_dict = create_shortage_sources(input_data, node_dict)
     node_dict = create_renewables(input_data, im, node_dict)
     node_dict = create_demand(input_data, im, node_dict)

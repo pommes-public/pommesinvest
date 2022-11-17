@@ -132,6 +132,76 @@ def create_buses(input_data, node_dict):
     return node_dict
 
 
+def create_linking_transformers(input_data, im, node_dict):
+    r"""Create linking transformers and add them to the dict of nodes.
+
+    Linking transformers serve for modeling interconnector capacities
+
+    Parameters
+    ----------
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
+
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Dictionary containing all nodes of the EnergySystem
+
+    Returns
+    -------
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Modified dictionary containing all nodes of the EnergySystem including
+        the interconnection transformers elements
+    """
+    # try and except statement since not all countries might be modeled
+    for i, l in input_data["linking_transformers"].iterrows():
+        try:
+            if l["type"] == "DC":
+                node_dict[i] = solph.components.Transformer(
+                    label=i,
+                    inputs={
+                        node_dict[l["from"]]: solph.Flow(
+                            nominal_value=l["2050"],
+                            max=input_data["linking_transformers_annual_ts"]
+                            .loc[im.start_time : im.end_time, i]
+                            .to_numpy(),
+                        )
+                    },
+                    outputs={node_dict[l["to"]]: solph.Flow()},
+                    conversion_factors={
+                        (node_dict[l["from"]], node_dict[l["to"]]): l[
+                            "conversion_factor"
+                        ]
+                    },
+                )
+
+            if l["type"] == "AC":
+                node_dict[i] = solph.components.Transformer(
+                    label=i,
+                    inputs={
+                        node_dict[l["from"]]: solph.Flow(
+                            nominal_value=l["2050"],
+                            max=input_data["linking_transformers_ts"]
+                            .loc[im.start_time : im.end_time, i]
+                            .to_numpy(),
+                        )
+                    },
+                    outputs={node_dict[l["to"]]: solph.Flow()},
+                    conversion_factors={
+                        (node_dict[l["from"]], node_dict[l["to"]]): l[
+                            "conversion_factor"
+                        ]
+                    },
+                )
+
+        except KeyError:
+            pass
+
+    return node_dict
+
+
 def create_commodity_sources(input_data, im, node_dict):
     r"""Create commodity sources and add them to the dict of nodes.
 
