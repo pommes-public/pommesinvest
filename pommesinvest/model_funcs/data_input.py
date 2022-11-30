@@ -35,7 +35,8 @@ from pommesinvest.model_funcs.subroutines import (
     create_new_built_transformers_myopic_horizon,
     create_renewables,
     create_shortage_sources,
-    load_input_data, create_linking_transformers,
+    load_input_data,
+    create_linking_transformers,
 )
 
 
@@ -105,6 +106,7 @@ def parse_input_data(im):
             + f"{im.flexibility_options_scenario}%_nominal"
         ),
         "linking_transformers_annual_ts": "linking_transformers_annual_ts",
+        "storages_el_exogenous_max_ts": "storages_el_exogenous_max_ts",
     }
 
     # Time-invariant data sets
@@ -221,6 +223,7 @@ def resample_input_data(input_data, im):
         "costs_operation_ts",
         "costs_operation_storages_ts",
         "linking_transformers_annual_ts",
+        "storages_el_exogenous_max_ts",
     ]
     hourly_ts = [
         "sinks_demand_el_ts",
