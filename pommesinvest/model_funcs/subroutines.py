@@ -677,9 +677,9 @@ def create_exogenous_transformers(
     im,
     node_dict,
 ):
-    """Create exogeneous transformers and add them to the dict of nodes
+    """Create exogenous transformers and add them to the dict of nodes
 
-    exogeneous transformers (fleets) are created for which no investments
+    exogenous transformers (fleets) are created for which no investments
     are considered and which are instead phased in / out by increasing / reducing
     capacities based on commissioning date / unit age
 
@@ -1057,8 +1057,19 @@ def create_exogenous_storages(input_data, im, node_dict):
                                 f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
-                        min=s["min_load_factor"],
-                        max=s["max_load_factor"],
+                        min=(
+                            s["min_load_factor"]
+                            * input_data["storages_el_exogenous_max_ts"].loc[
+                                im.start_time : im.end_time, i
+                            ]
+                        ).to_numpy(),
+                        # No inflow until storage capacity is actually available
+                        max=(
+                            s["max_load_factor"]
+                            * input_data["storages_el_exogenous_max_ts"].loc[
+                                im.start_time : im.end_time, i
+                            ]
+                        ).to_numpy(),
                     )
                 },
                 outputs={
@@ -1070,12 +1081,28 @@ def create_exogenous_storages(input_data, im, node_dict):
                                 f"storage_el_{s['type']}",
                             ]
                         ).to_numpy(),
-                        min=s["min_load_factor"],
-                        max=s["max_load_factor"],
+                        min=(
+                            s["min_load_factor"]
+                            * input_data["storages_el_exogenous_max_ts"].loc[
+                                im.start_time : im.end_time, i
+                            ]
+                        ).to_numpy(),
+                        # No outflow until storage capacity is actually available
+                        max=(
+                            s["max_load_factor"]
+                            * input_data["storages_el_exogenous_max_ts"].loc[
+                                im.start_time : im.end_time, i
+                            ]
+                        ).to_numpy(),
                     )
                 },
                 nominal_storage_capacity=s["nominal_storable_energy"],
-                loss_rate=s["loss_rate"],
+                loss_rate=(
+                    input_data["storages_el_exogenous_max_ts"].loc[
+                        im.start_time : im.end_time, i
+                    ]
+                    * s["loss_rate"]
+                ).to_numpy(),
                 initial_storage_level=s["initial_storage_level"],
                 max_storage_level=s["max_storage_level"],
                 min_storage_level=s["min_storage_level"],
