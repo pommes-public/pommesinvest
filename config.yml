@@ -26,6 +26,7 @@ control_parameters:
             "SE2",
             "SE3",
             "SE4",
+            "IT",
         ]
     solver: "gurobi"
     solver_commandline_options: False
@@ -42,7 +43,7 @@ control_parameters:
     impose_investment_maxima: True
     save_production_results: True
     save_investment_results: True
-    write_lp_file: True
+    write_lp_file: False
 
 # 2) Set model optimization time and frequency
 time_parameters:
