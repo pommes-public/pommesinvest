@@ -31,6 +31,7 @@ control_parameters:
         "SE2",
         "SE3",
         "SE4",
+        "IT",
     ]
     solver: "gurobi"
     solver_commandline_options: False
