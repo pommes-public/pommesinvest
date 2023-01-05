@@ -12,6 +12,7 @@ Python version >= 3.8
 """
 
 import math
+import os
 from datetime import datetime
 from itertools import compress
 
@@ -221,11 +222,12 @@ def cut_leap_days(time_series):
         if is_leap_year(year):
             try:
                 time_series.drop(
-                        time_series.loc[
-                            (time_series.index.year == year)
-                            & (time_series.index.month == 12)
-                            & (time_series.index.day == 31)
-                        ].index, inplace=True
+                    time_series.loc[
+                        (time_series.index.year == year)
+                        & (time_series.index.month == 12)
+                        & (time_series.index.day == 31)
+                    ].index,
+                    inplace=True,
                 )
             except KeyError:
                 continue
@@ -316,3 +318,40 @@ def days_between(d1, d2):
     day_diff = abs((d2 - d1).days)
 
     return day_diff
+
+
+def make_directory_if_missing(folder: str, relative=False) -> None:
+    """Add directories if missing; works with at maximum 2 sub levels
+
+    Parameters
+    ----------
+    folder: str
+        path to folder to be created
+
+    relative: bool
+        If True, create new folder using a relative path;
+        else use absolute path
+    """
+    if os.path.exists(folder):
+        pass
+    else:
+        if os.path.exists(folder.rsplit("/", 2)[0]):
+            if not relative:
+                path = folder
+            else:
+                path = "./" + folder
+            os.mkdir(path)
+        else:
+            if not relative:
+                path = folder.rsplit("/", 2)[0]
+            else:
+                path = "./" + folder.rsplit("/", 2)[0]
+            os.mkdir(path)
+            subpath = folder
+            os.mkdir(subpath)
+    if not os.path.exists(folder):
+        raise ValueError(
+            f"Was not able to create path {folder}. "
+            f"Note that at most two non-existent sub levels "
+            f"for a path may be added."
+        )

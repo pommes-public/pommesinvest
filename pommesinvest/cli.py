@@ -35,6 +35,7 @@ control_parameters:
     ]
     solver: "gurobi"
     solver_commandline_options: False
+    solver_tmp_dir: "default"
     fuel_cost_pathway: "NZE"
     fuel_price_shock: "high"
     emissions_cost_pathway: "long-term"
