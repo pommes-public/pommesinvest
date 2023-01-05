@@ -572,6 +572,12 @@ class InvestmentModel(object):
         Be aware that this may lead to model infeasibility
         if commodity bus balances cannot be met.
 
+        Also note that since flows minima and maxima are multiplied with
+        the multiplier accounting for the model frequency, considering
+        the model time increment (equal to the multiplier) would lead
+        to double accounting for emissions. Thus, emission factors are
+        scaled down using the multiplier.
+
         Parameters
         ----------
         emissions_limit : float
@@ -609,6 +615,11 @@ class InvestmentModel(object):
 
         for (i, o) in self.om.flows:
             if any(x in o.label for x in emission_flow_labels):
+                # Correct emission factors by multiplier
+                # in order not to double account emissions
+                self.om.flows[(i, o)].emission_factor = (
+                    self.om.flows[(i, o)].emission_factor / self.multiplier
+                )
                 emission_flows[(i, o)] = self.om.flows[(i, o)]
 
         if self.activate_emissions_budget_limit:

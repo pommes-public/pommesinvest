@@ -122,7 +122,6 @@ def run_investment_model(config_file="./config.yml"):
                 f"{im.path_folder_output}pommesinvest_model.lp",
                 io_options={"symbolic_solver_labels": True},
             )
-        from pyomo.util.infeasible import log_infeasible_constraints
         if im.solver_commandline_options:
             logging.info(
                 "Using solver command line options.\n"
@@ -137,7 +136,6 @@ def run_investment_model(config_file="./config.yml"):
             )
         else:
             im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
-        log_infeasible_constraints(im.om)
         meta_results = processing.meta_results(im.om)
 
         model_meta["overall_objective"] = meta_results["objective"]

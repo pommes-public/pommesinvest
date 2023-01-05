@@ -317,13 +317,3 @@ def days_between(d1, d2):
     day_diff = abs((d2 - d1).days)
 
     return day_diff
-
-
-def calculate_emissions_per_plant(t, outflow_args_el, sources_commodity):
-    """Calculate emissions of a plant caused by it running at minimum load"""
-    return sum(
-        outflow_args_el["min"]
-        * outflow_args_el["nominal_value"]
-        / t["efficiency_el"]
-        * sources_commodity.at[f"DE_source_{t['fuel']}", "emission_factors"]
-    )
