@@ -56,9 +56,11 @@ import pandas as pd
 import yaml
 from oemof.solph import processing
 from oemof.solph import views
+from pyomo.common.tempfiles import TempfileManager
 from yaml.loader import SafeLoader
 
 from pommesinvest.model_funcs import model_control
+from pommesinvest.model_funcs.helpers import make_directory_if_missing
 from pommesinvest.model_funcs.results_processing import (
     process_demand_response_results,
     filter_storage_results,
@@ -122,6 +124,16 @@ def run_investment_model(config_file="./config.yml"):
                 f"{im.path_folder_output}pommesinvest_model.lp",
                 io_options={"symbolic_solver_labels": True},
             )
+        if im.solver_tmp_dir != "default":
+            logging.info(
+                f"Adjusting directory to store tmp solver files. "
+                f"Temporary files are stored at {im.solver_tmp_dir}"
+            )
+            if -1 < im.solver_tmp_dir.find("./") <= 1:
+                make_directory_if_missing(im.solver_tmp_dir, relative=True)
+            else:
+                make_directory_if_missing(im.solver_tmp_dir)
+            TempfileManager.tempdir = im.solver_tmp_dir
         if im.solver_commandline_options:
             logging.info(
                 "Using solver command line options.\n"

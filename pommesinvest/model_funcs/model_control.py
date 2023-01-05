@@ -96,6 +96,10 @@ class InvestmentModel(object):
     solver_commandline_options: bool
         If True, use solver command line option; If False, use solver defaults
 
+    solver_tmp_dir: str
+        Directory for solver to store tmp files;
+        Will be adjusted if set other than 'default'
+    
     fuel_cost_pathway :  str
         A predefined pathway for commodity cost development until 2050
 
@@ -288,6 +292,7 @@ class InvestmentModel(object):
         self.countries = None
         self.solver = None
         self.solver_commandline_options = None
+        self.solver_tmp_dir = None
         self.fuel_cost_pathway = None
         self.fuel_price_shock = None
         self.emissions_cost_pathway = None
