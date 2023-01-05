@@ -705,7 +705,6 @@ def create_exogenous_transformers(
         # HACK: Use annual capacity values and max timeseries
         # to depict commissioning of new / decommissioning existing units
 
-        # TODO: Define minimum investment requirement for CHP units (also heat pumps etc as providers)
         maximum = (
             (
                 input_data["transformers_exogenous_max_ts"].loc[
@@ -730,7 +729,6 @@ def create_exogenous_transformers(
         }
 
         # Assign minimum loads for German CHP and IPP plants
-        # TODO: Create aggregated minimum load profiles!
         if t["type"] == "chp":
             if t["fuel"] in ["natgas", "hardcoal", "lignite"]:
                 outflow_args_el["min"] = (
@@ -761,6 +759,21 @@ def create_exogenous_transformers(
                 .to_numpy()
             )
 
+        # HACK: Reduce minimum output in order not to exceed emissions caps
+        multiplier = 1
+        if im.activate_emissions_budget_limit:
+            multiplier *= (
+                input_data["emission_development_factors"]
+                .loc[im.start_year : im.end_year, im.emissions_pathway]
+                .mean()
+            )
+        if im.activate_emissions_pathway_limit:
+            multiplier *= (
+                input_data["emission_development_factors"].loc[
+                    im.start_time : im.end_time, im.emissions_pathway
+                ]
+            ).values
+
         # Correct minimum load by maximum capacities of particular time
         outflow_args_el["min"] *= (
             input_data["transformers_exogenous_max_ts"]
@@ -769,6 +782,7 @@ def create_exogenous_transformers(
                 i,
             ]
             .to_numpy()
+            * multiplier
         )
 
         node_dict[i] = build_condensing_transformer(
