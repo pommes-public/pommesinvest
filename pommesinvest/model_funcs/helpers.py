@@ -221,11 +221,12 @@ def cut_leap_days(time_series):
         if is_leap_year(year):
             try:
                 time_series.drop(
-                        time_series.loc[
-                            (time_series.index.year == year)
-                            & (time_series.index.month == 12)
-                            & (time_series.index.day == 31)
-                        ].index, inplace=True
+                    time_series.loc[
+                        (time_series.index.year == year)
+                        & (time_series.index.month == 12)
+                        & (time_series.index.day == 31)
+                    ].index,
+                    inplace=True,
                 )
             except KeyError:
                 continue
@@ -316,3 +317,13 @@ def days_between(d1, d2):
     day_diff = abs((d2 - d1).days)
 
     return day_diff
+
+
+def calculate_emissions_per_plant(t, outflow_args_el, sources_commodity):
+    """Calculate emissions of a plant caused by it running at minimum load"""
+    return sum(
+        outflow_args_el["min"]
+        * outflow_args_el["nominal_value"]
+        / t["efficiency_el"]
+        * sources_commodity.at[f"DE_source_{t['fuel']}", "emission_factors"]
+    )

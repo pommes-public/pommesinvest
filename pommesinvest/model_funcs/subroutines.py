@@ -29,6 +29,8 @@ import oemof.solph as solph
 import pandas as pd
 from oemof.tools import economics
 
+from pommesinvest.model_funcs.helpers import calculate_emissions_per_plant
+
 
 def load_input_data(filename=None, im=None):
     r"""Load input data from csv files.
@@ -701,6 +703,17 @@ def create_exogenous_transformers(
         Modified dictionary containing all nodes of the EnergySystem including
         the exogenous transformer elements
     """
+    overall_emissions = {
+        "chp": {
+            fuel: 0 for fuel in input_data["exogenous_transformers"].fuel.unique()
+        },
+        "ipp": {
+            fuel: 0 for fuel in input_data["exogenous_transformers"].fuel.unique()
+        },
+        "other": {
+            fuel: 0 for fuel in input_data["exogenous_transformers"].fuel.unique()
+        },
+    }
     for i, t in input_data["exogenous_transformers"].iterrows():
         # HACK: Use annual capacity values and max timeseries
         # to depict commissioning of new / decommissioning existing units
@@ -764,20 +777,20 @@ def create_exogenous_transformers(
         # HACK: Reduce minimum output in order not to exceed emissions caps
         # TODO: Find out why "real" emissions seem so far off limit and adjust
         multiplier = 1
-        if im.activate_emissions_budget_limit:
-            multiplier = 0.2
-            multiplier *= (
-                input_data["emission_development_factors"]
-                .loc[im.start_year : im.end_year, im.emissions_pathway]
-                .mean()
-            )
-        if im.activate_emissions_pathway_limit:
-            multiplier = 0.2
-            multiplier *= (
-                input_data["emission_development_factors"].loc[
-                    im.start_time : im.end_time, im.emissions_pathway
-                ]
-            ).values
+        # if im.activate_emissions_budget_limit:
+        #     multiplier = 0.2
+        #     multiplier *= (
+        #         input_data["emission_development_factors"]
+        #         .loc[im.start_year : im.end_year, im.emissions_pathway]
+        #         .mean()
+        #     )
+        # if im.activate_emissions_pathway_limit:
+        #     multiplier = 0.3
+        #     multiplier *= (
+        #         input_data["emission_development_factors"].loc[
+        #             im.start_time : im.end_time, im.emissions_pathway
+        #         ]
+        #     ).values
 
         # Correct minimum load by maximum capacities of particular time
         outflow_args_el["min"] *= (
@@ -791,9 +804,21 @@ def create_exogenous_transformers(
             * multiplier
         )
 
+        emissions_per_plant = calculate_emissions_per_plant(
+            t, outflow_args_el, input_data["sources_commodity"]
+        )
+        if t["type"] == "chp":
+            overall_emissions["chp"][t["fuel"]] += emissions_per_plant
+        elif t["type"] == "ipp":
+            overall_emissions["chp"][t["fuel"]] += emissions_per_plant
+        else:
+            overall_emissions["other"][t["fuel"]] += emissions_per_plant
+
         node_dict[i] = build_condensing_transformer(
             i, t, node_dict, outflow_args_el
         )
+
+    emissions_df = pd.DataFrame(overall_emissions)
 
     return node_dict
 
