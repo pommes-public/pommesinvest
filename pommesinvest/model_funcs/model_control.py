@@ -214,6 +214,10 @@ class InvestmentModel(object):
         If an emissions budget limit is chosen, it is calculated based on the
         given pathway.
 
+    use_technology_specific_wacc: boolean
+        If True, discriminate wacc among technologies, else use interest_value
+        as wacc (social planner with ideal level-playing field)
+    
     activate_demand_response : boolean
         boolean control variable indicating whether to introduce
         demand response to the model
@@ -300,6 +304,7 @@ class InvestmentModel(object):
         self.activate_emissions_budget_limit = None
         self.activate_emissions_pathway_limit = None
         self.emissions_pathway = None
+        self.use_technology_specific_wacc = None
         self.activate_demand_response = None
         self.demand_response_approach = None
         self.demand_response_scenario = None
