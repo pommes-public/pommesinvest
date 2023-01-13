@@ -38,6 +38,7 @@ control_parameters:
     activate_emissions_budget_limit: False
     activate_emissions_pathway_limit: True
     emissions_pathway: "KNS_2035"
+    use_technology_specific_wacc: True
     activate_demand_response: True
     demand_response_approach: "DLR"
     demand_response_scenario: "50"

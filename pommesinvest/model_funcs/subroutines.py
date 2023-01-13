@@ -494,10 +494,11 @@ def create_demand_response_units(input_data, im, node_dict):
             "oemof": {"approach": "oemof", "shift_interval": 24},
         }
 
-        if "ind" in dr_cluster:
-            dr_kind = "DR_industry"
+        dr_kind = f"DR_{dr_cluster.split('_')[0]}"
+        if im.use_technology_specific_wacc:
+            interest_rate = input_data["wacc"].loc[dr_kind, "wacc in p.u."]
         else:
-            dr_kind = "DR_other"
+            interest_rate = input_data["interest_rate"].loc["value"][0]
 
         # Investment limit: maximum of positive (i.e. downshift)
         # and negative (i.e. upshift) potential
@@ -519,7 +520,7 @@ def create_demand_response_units(input_data, im, node_dict):
                     f"{im.start_year}-01-01", "specific_investments"
                 ],
                 n=30,  # TODO: Replace hard-coding!
-                wacc=input_data["wacc"].loc[dr_kind, "wacc in p.u."],
+                wacc=interest_rate,
             ),
         }
 
@@ -552,7 +553,7 @@ def create_demand_response_units(input_data, im, node_dict):
             multi_period_invest_kwargs = {
                 "lifetime": 30,  # TODO: Replace hard-coding!
                 "age": 0,
-                "interest_rate": input_data["interest_rate"].loc["value"][0],
+                "interest_rate": interest_rate,
                 "fixed_costs": dr_cluster_fixed_costs_and_investments_data[
                     "fixed_costs"
                 ].to_numpy(),
@@ -855,6 +856,13 @@ def create_new_built_transformers(
         else:
             invest_max = float(1e10)
 
+        if im.use_technology_specific_wacc:
+            interest_rate = input_data["wacc"].loc[
+                t["tech_fuel"], "wacc in p.u."
+            ]
+        else:
+            interest_rate = input_data["interest_rate"].loc["value"][0]
+
         invest_kwargs = {
             "maximum": invest_max,
             "existing": 0,
@@ -865,7 +873,7 @@ def create_new_built_transformers(
                     f"{im.start_year}-01-01", t["tech_fuel"]
                 ],
                 n=t["unit_lifetime"],
-                wacc=input_data["wacc"].loc[t["tech_fuel"], "wacc in p.u."],
+                wacc=interest_rate,
             ),
         }
         if im.multi_period:
@@ -881,7 +889,7 @@ def create_new_built_transformers(
             multi_period_invest_kwargs = {
                 "lifetime": t["unit_lifetime"],
                 "age": 0,
-                "interest_rate": input_data["interest_rate"].loc["value"][0],
+                "interest_rate": interest_rate,
                 "fixed_costs": input_data["fixed_costs"].loc[
                     t["tech_fuel"], "fixed_costs_percent_per_year"
                 ],
@@ -1319,9 +1327,12 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_max_turbine = 1e9
             invest_max = 1e9
 
-        wacc = input_data["wacc"].loc[
-            f"storage_el_{s['type']}", "wacc in p.u."
-        ]
+        if im.use_technology_specific_wacc:
+            interest_rate = input_data["wacc"].loc[
+                f"storage_el_{s['type']}", "wacc in p.u."
+            ]
+        else:
+            interest_rate = input_data["interest_rate"].loc["value"][0]
 
         invest_kwargs = {
             "inflow": {
@@ -1334,7 +1345,7 @@ def create_new_built_storages(input_data, im, node_dict):
                     ]
                     * s["efficiency_pump"],
                     n=s["unit_lifetime_pump"],
-                    wacc=wacc,
+                    wacc=interest_rate,
                 ),
                 "existing": 0,
             },
@@ -1345,7 +1356,7 @@ def create_new_built_storages(input_data, im, node_dict):
                     # to storage capacity itself resp. inflow
                     capex=1e-8,
                     n=s["unit_lifetime_turbine"],
-                    wacc=wacc,
+                    wacc=interest_rate,
                 ),
                 "existing": 0,
             },
@@ -1356,7 +1367,7 @@ def create_new_built_storages(input_data, im, node_dict):
                         f"{im.start_year}-01-01", f"storage_el_{s['type']}"
                     ],
                     n=s["unit_lifetime"],
-                    wacc=wacc,
+                    wacc=interest_rate,
                 ),
                 "existing": 0,
             },
@@ -1389,27 +1400,21 @@ def create_new_built_storages(input_data, im, node_dict):
                 "inflow": {
                     "lifetime": s["unit_lifetime_pump"],
                     "age": 0,
-                    "interest_rate": input_data["interest_rate"].loc["value"][
-                        0
-                    ],
+                    "interest_rate": interest_rate,
                     # "fixed_costs": s["fixed_costs_pump"],
                     "overall_maximum": overall_maximum_pump,
                 },
                 "outflow": {
                     "lifetime": s["unit_lifetime_turbine"],
                     "age": 0,
-                    "interest_rate": input_data["interest_rate"].loc["value"][
-                        0
-                    ],
+                    "interest_rate": interest_rate,
                     # "fixed_costs": s["fixed_costs_turbine"],
                     "overall_maximum": overall_maximum_turbine,
                 },
                 "capacity": {
                     "lifetime": s["unit_lifetime"],
                     "age": 0,
-                    "interest_rate": input_data["interest_rate"].loc["value"][
-                        0
-                    ],
+                    "interest_rate": interest_rate,
                     "fixed_costs": input_data["fixed_costs_storages"].loc[
                         f"storage_el_{s['type']}",
                         "fixed_costs_percent_per_year",
