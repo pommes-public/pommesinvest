@@ -1343,7 +1343,7 @@ def create_new_built_storages(input_data, im, node_dict):
                     capex=input_data["costs_storages_investment_power"].loc[
                         f"{im.start_year}-01-01", f"storage_el_{s['type']}"
                     ]
-                    * s["efficiency_pump"],
+                    / s["efficiency_pump"],
                     n=s["unit_lifetime_pump"],
                     wacc=interest_rate,
                 ),
@@ -1386,7 +1386,7 @@ def create_new_built_storages(input_data, im, node_dict):
                     f"{im.start_year}-01-01":f"{im.end_year}-01-01",
                     f"storage_el_{s['type']}",
                 ]
-                * s["efficiency_pump"]
+                / s["efficiency_pump"]
             ).to_numpy()
             invest_kwargs["outflow"]["ep_costs"] = 1e-8
             invest_kwargs["capacity"]["ep_costs"] = (
