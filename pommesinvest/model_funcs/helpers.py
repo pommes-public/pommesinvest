@@ -355,3 +355,25 @@ def make_directory_if_missing(folder: str, relative=False) -> None:
             f"Note that at most two non-existent sub levels "
             f"for a path may be added."
         )
+
+
+def calc_absolute_fixed_costs(
+    specific_investments, fixed_costs_percentage_share
+):
+    """Calculate fixed costs from specific investments and percentage share
+
+    Parameters
+    ----------
+    specific_investments: list
+        specific investments per period (year)
+
+    fixed_costs_percentage_share: float
+        percentage share of specific investments which accounts
+        to fixed costs
+
+    Returns
+    -------
+    absolute_fixed_costs: list
+        absolute fixed costs per period
+    """
+    return specific_investments * fixed_costs_percentage_share / 100
