@@ -29,6 +29,8 @@ import oemof.solph as solph
 import pandas as pd
 from oemof.tools import economics
 
+from pommesinvest.model_funcs.helpers import calc_absolute_fixed_costs
+
 
 def load_input_data(filename=None, im=None):
     r"""Load input data from csv files.
@@ -877,22 +879,31 @@ def create_new_built_transformers(
             ),
         }
         if im.multi_period:
+            all_investment_expenses = input_data["costs_investment"].loc[
+                :, t["tech_fuel"]
+            ]
+            investment_expenses = np.array(
+                all_investment_expenses.loc[
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                ]
+            )
+            fixed_costs_percentage_share = input_data["fixed_costs"].loc[
+                t["tech_fuel"], "fixed_costs_percent_per_year"
+            ]
+
             if "_hydrogen_" not in i:
                 invest_max = annual_invest_limit
             invest_kwargs["maximum"] = invest_max
-            invest_kwargs["ep_costs"] = np.array(
-                input_data["costs_investment"].loc[
-                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
-                    t["tech_fuel"],
-                ]
-            )
+            invest_kwargs["ep_costs"] = investment_expenses
             multi_period_invest_kwargs = {
                 "lifetime": t["unit_lifetime"],
                 "age": 0,
                 "interest_rate": interest_rate,
-                "fixed_costs": input_data["fixed_costs"].loc[
-                    t["tech_fuel"], "fixed_costs_percent_per_year"
-                ],
+                "fixed_costs": np.array(
+                    calc_absolute_fixed_costs(
+                        all_investment_expenses, fixed_costs_percentage_share
+                    )
+                ),
                 "overall_maximum": overall_maximum,
             }
             invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
@@ -1374,6 +1385,29 @@ def create_new_built_storages(input_data, im, node_dict):
         }
 
         if im.multi_period:
+            # Extract investment expenses: capacity
+            all_capacity_investment_expenses = input_data[
+                "costs_storages_investment_capacity"
+            ].loc[:, f"storage_el_{s['type']}"]
+            investment_expenses_capacity = (
+                all_capacity_investment_expenses.loc[
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                ]
+            ).to_numpy()
+            # Extract investment expenses: power
+            all_power_investment_expenses = input_data[
+                "costs_storages_investment_power"
+            ].loc[:, f"storage_el_{s['type']}"]
+            investment_expenses_power = (
+                all_power_investment_expenses.loc[
+                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
+                ]
+            ).to_numpy()
+            # Extract fixed costs
+            fixed_costs_percentage_share = input_data[
+                "fixed_costs_storages"
+            ].loc[f"storage_el_{s['type']}", "fixed_costs_percent_per_year"]
+
             invest_max_pump = annual_invest_limit_pump
             invest_max_turbine = annual_invest_limit_turbine
             invest_max = annual_invest_limit
@@ -1382,43 +1416,42 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_kwargs["capacity"]["maximum"] = invest_max
 
             invest_kwargs["inflow"]["ep_costs"] = (
-                input_data["costs_storages_investment_power"].loc[
-                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
-                    f"storage_el_{s['type']}",
-                ]
-                / s["efficiency_pump"]
-            ).to_numpy()
+                investment_expenses_power / s["efficiency_pump"]
+            )
             invest_kwargs["outflow"]["ep_costs"] = 1e-8
-            invest_kwargs["capacity"]["ep_costs"] = (
-                input_data["costs_storages_investment_capacity"].loc[
-                    f"{im.start_year}-01-01":f"{im.end_year}-01-01",
-                    f"storage_el_{s['type']}",
-                ]
-            ).to_numpy()
+            invest_kwargs["capacity"][
+                "ep_costs"
+            ] = investment_expenses_capacity
 
             multi_period_invest_kwargs = {
                 "inflow": {
                     "lifetime": s["unit_lifetime_pump"],
                     "age": 0,
                     "interest_rate": interest_rate,
-                    # "fixed_costs": s["fixed_costs_pump"],
+                    "fixed_costs": np.array(
+                        calc_absolute_fixed_costs(
+                            all_power_investment_expenses / s["efficiency_pump"],
+                            fixed_costs_percentage_share,
+                        )
+                    ),
                     "overall_maximum": overall_maximum_pump,
                 },
                 "outflow": {
                     "lifetime": s["unit_lifetime_turbine"],
                     "age": 0,
                     "interest_rate": interest_rate,
-                    # "fixed_costs": s["fixed_costs_turbine"],
                     "overall_maximum": overall_maximum_turbine,
                 },
                 "capacity": {
                     "lifetime": s["unit_lifetime"],
                     "age": 0,
                     "interest_rate": interest_rate,
-                    "fixed_costs": input_data["fixed_costs_storages"].loc[
-                        f"storage_el_{s['type']}",
-                        "fixed_costs_percent_per_year",
-                    ],
+                    "fixed_costs": np.array(
+                        calc_absolute_fixed_costs(
+                            all_capacity_investment_expenses,
+                            fixed_costs_percentage_share,
+                        )
+                    ),
                     "overall_maximum": overall_maximum_turbine,
                 },
             }
