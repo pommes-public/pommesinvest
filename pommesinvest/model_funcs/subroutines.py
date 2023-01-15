@@ -400,6 +400,24 @@ def create_demand_response_units(input_data, im, node_dict):
             f"sinks_dr_el_{dr_cluster}_fixed_costs_and_investments"
         ]
 
+        max_delay_time = math.ceil(
+            dr_cluster_potential_data.at[2020, "shifting_duration"]
+        )
+        if im.use_subset_of_delay_times:
+            for i in range(1, 4):
+                if max_delay_time == i:
+                    delay_time = i
+                    break
+            if max_delay_time > 4:
+                delay_time = [
+                    1,
+                    2,
+                    math.ceil(max_delay_time / 2),
+                    max_delay_time,
+                ]
+        else:
+            delay_time = max_delay_time
+
         # kwargs for all demand response modeling approaches
         # for constant values, simply extract 2020 entries from data set
         kwargs_all = {
@@ -422,9 +440,6 @@ def create_demand_response_units(input_data, im, node_dict):
                 dr_cluster_potential_data.loc[
                     im.start_year : im.end_year, "max_cap"
                 ]
-            ),
-            "delay_time": math.ceil(
-                dr_cluster_potential_data.at[2020, "shifting_duration"]
             ),
             "shed_time": math.ceil(
                 dr_cluster_potential_data.at[
@@ -458,12 +473,14 @@ def create_demand_response_units(input_data, im, node_dict):
         kwargs_dict = {
             "DIW": {
                 "approach": "DIW",
+                "delay_time": max_delay_time,
                 "recovery_time_shift": math.ceil(
                     dr_cluster_potential_data.at[2020, "regeneration_duration"]
                 ),
             },
             "DLR": {
                 "approach": "DLR",
+                "delay_time": delay_time,
                 "shift_time": min(
                     math.ceil(
                         dr_cluster_potential_data.at[
@@ -475,9 +492,7 @@ def create_demand_response_units(input_data, im, node_dict):
                             2020, "interference_duration_pos"
                         ]
                     ),
-                    math.ceil(
-                        dr_cluster_potential_data.at[2020, "shifting_duration"]
-                    ),
+                    max_delay_time,
                 ),
                 "ActivateYearLimit": True,
                 "ActivateDayLimit": False,
@@ -587,7 +602,8 @@ def create_demand_response_units(input_data, im, node_dict):
                 **kwargs_all,
                 **kwargs_dict[key],
                 investment=solph.Investment(**invest_kwargs),
-            ) for key in kwargs_dict
+            )
+            for key in kwargs_dict
         }
 
         node_dict[dr_cluster] = approach_dict[im.demand_response_approach]

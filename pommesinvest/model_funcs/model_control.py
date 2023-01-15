@@ -233,6 +233,12 @@ class InvestmentModel(object):
         A predefined demand response scenario to be modeled
         Options: '5', '50', '95', whereby '5' is the lower,
         i.e. rather pessimistic estimate
+    
+    use_subset_of_delay_times : boolean
+        If True, only allow for a subset of the given maximum delay time
+        of demand response units. The allowed subset hereby is defined as
+        [1, 2, delay_time/2, delay_time] since this reflects short-, medium-
+        and long-term shifting processes while limiting model complexity.
 
     save_production_results : boolean
         boolean control variable indicating whether to save the dispatch
@@ -308,6 +314,7 @@ class InvestmentModel(object):
         self.activate_demand_response = None
         self.demand_response_approach = None
         self.demand_response_scenario = None
+        self.use_subset_of_delay_times = None
         self.save_production_results = None
         self.save_investment_results = None
         self.write_lp_file = None
@@ -521,6 +528,8 @@ class InvestmentModel(object):
                 f"for DEMAND RESPONSE modeling\n"
                 f"Considering a {self.demand_response_scenario}% scenario"
             )
+            if self.use_subset_of_delay_times:
+                dr_string += " using only a SUBSET of DELAY TIMES"
 
         else:
             dr_string = "Running a model WITHOUT DEMAND RESPONSE"
