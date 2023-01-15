@@ -47,6 +47,7 @@ control_parameters:
     activate_demand_response: False
     demand_response_approach: "DLR"
     demand_response_scenario: "50"
+    use_subset_of_delay_times: False
     impose_investment_maxima: True
     save_production_results: True
     save_investment_results: True
