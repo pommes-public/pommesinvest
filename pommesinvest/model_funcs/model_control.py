@@ -21,7 +21,6 @@ import math
 
 import oemof.solph as solph
 import pandas as pd
-
 # constraints, views, models, network, processing
 from oemof.tools import logger
 
@@ -252,6 +251,10 @@ class InvestmentModel(object):
         boolean control variable indicating whether to save an lp file
         *CAUTION*: Only use for debugging when simulating small time frames
 
+    extract_duals : boolean
+        boolean control variable indicating whether to save dual values of bus
+        balance constraint
+    
     start_time : str
         A date string of format "YYYY-MM-DD hh:mm:ss" defining the start time
         of the simulation
@@ -318,6 +321,7 @@ class InvestmentModel(object):
         self.save_production_results = None
         self.save_investment_results = None
         self.write_lp_file = None
+        self.extract_duals = None
         self.start_time = None
         self.end_time = None
         self.optimization_timeframe = None
@@ -657,6 +661,31 @@ class InvestmentModel(object):
                 f"Introducing an EMISSIONS PATHWAY LIMIT using pathway "
                 f"{self.emissions_pathway}."
             )
+
+    def get_power_prices_from_duals(self):
+        r"""Obtain the power price results for the dispatch model
+
+        The power prices are obtained from the dual value of the
+        Bus.balance constraint of the German electricity bus.
+
+        Returns
+        -------
+        power_prices: :obj:`pd.DataFrame`
+        """
+        constr = self.om.BusBlock.balance
+
+        power_prices_list = [
+            self.om.dual[constr[index]]
+            for index in constr
+            if index[0].label == "DE_bus_el"
+        ]
+        power_prices = pd.DataFrame(
+            data=power_prices_list,
+            index=self.om.es.timeindex,
+            columns=["Power price"],
+        )
+
+        return power_prices
 
     def determine_periods(self, datetimeindex):
         """Explicitly define and return periods of the energy system
