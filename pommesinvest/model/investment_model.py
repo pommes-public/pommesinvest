@@ -119,6 +119,13 @@ def run_investment_model(config_file="./config.yml"):
     if not im.myopic_horizon:
         im.build_simple_model()
 
+        if im.extract_duals:
+            im.om.receive_duals()
+            logging.info(
+                "Obtaining dual values and reduced costs from the model\n"
+                "in order to calculate power prices."
+            )
+
         if im.write_lp_file:
             im.om.write(
                 f"{im.path_folder_output}pommesinvest_model.lp",
@@ -148,6 +155,10 @@ def run_investment_model(config_file="./config.yml"):
             )
         else:
             im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
+
+        if im.extract_duals:
+            power_prices = im.get_power_prices_from_duals()
+
         meta_results = processing.meta_results(im.om)
 
         model_meta["overall_objective"] = meta_results["objective"]
@@ -245,6 +256,14 @@ def run_investment_model(config_file="./config.yml"):
             + "_production.csv",
             sep=",",
             decimal=".",
+        )
+
+    if im.extract_duals:
+        power_prices.to_csv(
+            im.path_folder_output + getattr(im, "filename")
+            + '_power-prices.csv',
+            sep=',',
+            decimal='.'
         )
 
 
