@@ -516,7 +516,9 @@ class InvestmentModel(object):
         filename = (
             f"investment_LP_start-{self.start_time[:10]}_"
             f"{self.optimization_timeframe}-years_{rh}_freq_{self.freq}_"
-            f"{dr}_{self.demand_response_scenario}"
+            f"{dr}_{self.demand_response_scenario}_"
+            f"fuel_price-{self.fuel_cost_pathway}_{self.fuel_price_shock}_"
+            f"co2_price-{self.emissions_cost_pathway}"
         )
 
         setattr(self, "filename", filename)
