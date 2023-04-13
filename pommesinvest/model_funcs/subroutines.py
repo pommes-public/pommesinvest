@@ -580,7 +580,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 .to_numpy()
             )
             multi_period_invest_kwargs = {
-                "lifetime": 15,  # TODO: Replace hard-coding!
+                "lifetime": dr_cluster_potential_data.at[2020, "unit_lifetime"],
                 "age": 0,
                 "interest_rate": interest_rate,
                 "fixed_costs": dr_cluster_fixed_costs_and_investments_data[
