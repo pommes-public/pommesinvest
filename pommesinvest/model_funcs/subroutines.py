@@ -464,7 +464,7 @@ def create_demand_response_units(input_data, im, node_dict):
             "cost_dsm_down_shed": dr_cluster_variable_costs_data.loc[
                 im.start_time : im.end_time, "variable_costs_shed"
             ].to_numpy(),
-            "efficiency": 1,  # TODO: Replace hard-coded entries!
+            "efficiency": dr_cluster_potential_data.at[2020, "efficiency"],
             "shed_eligibility": eligibility["shedding"],
             "shift_eligibility": eligibility["shifting"],
         }
@@ -548,7 +548,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 capex=dr_cluster_fixed_costs_and_investments_data.loc[
                     f"{im.start_year}-01-01", "specific_investments"
                 ],
-                n=15,  # TODO: Replace hard-coding!
+                n=dr_cluster_potential_data.at[2020, "unit_lifetime"],
                 wacc=interest_rate,
             ),
         }
