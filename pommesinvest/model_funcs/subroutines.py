@@ -548,7 +548,7 @@ def create_demand_response_units(input_data, im, node_dict):
                 capex=dr_cluster_fixed_costs_and_investments_data.loc[
                     f"{im.start_year}-01-01", "specific_investments"
                 ],
-                n=dr_cluster_potential_data.at[2020, "unit_lifetime"],
+                n=int(dr_cluster_potential_data.at[2020, "unit_lifetime"]),
                 wacc=interest_rate,
             ),
         }
@@ -580,7 +580,9 @@ def create_demand_response_units(input_data, im, node_dict):
                 .to_numpy()
             )
             multi_period_invest_kwargs = {
-                "lifetime": dr_cluster_potential_data.at[2020, "unit_lifetime"],
+                "lifetime": int(
+                    dr_cluster_potential_data.at[2020, "unit_lifetime"]
+                ),
                 "age": 0,
                 "interest_rate": interest_rate,
                 "fixed_costs": dr_cluster_fixed_costs_and_investments_data[
