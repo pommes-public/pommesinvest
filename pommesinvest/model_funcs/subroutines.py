@@ -593,22 +593,17 @@ def create_demand_response_units(input_data, im, node_dict):
             }
             invest_kwargs = {**invest_kwargs, **multi_period_invest_kwargs}
 
-        approach_dict = {
-            key: solph.components.experimental.SinkDSM(
-                label=dr_cluster,
-                inputs={
-                    node_dict[
-                        dr_cluster_potential_data.at[2020, "from"]
-                    ]: solph.flows.Flow(variable_costs=0)
-                },
-                **kwargs_all,
-                **kwargs_dict[key],
-                investment=solph.Investment(**invest_kwargs),
-            )
-            for key in kwargs_dict
-        }
-
-        node_dict[dr_cluster] = approach_dict[im.demand_response_approach]
+        node_dict[dr_cluster] = solph.components.experimental.SinkDSM(
+            label=dr_cluster,
+            inputs={
+                node_dict[
+                    dr_cluster_potential_data.at[2020, "from"]
+                ]: solph.flows.Flow(variable_costs=0)
+            },
+            **kwargs_all,
+            **kwargs_dict[im.demand_response_approach],
+            investment=solph.Investment(**invest_kwargs),
+        )
 
     return node_dict
 
