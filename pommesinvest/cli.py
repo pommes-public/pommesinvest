@@ -52,7 +52,9 @@ control_parameters:
     save_production_results: True
     save_investment_results: True
     write_lp_file: False
-    extract_duals: False
+    extract_duals: True
+    sensitivity_parameter: "None"
+    sensitivity_value: "None"
 
 # 2) Set model optimization time and frequency
 time_parameters:
