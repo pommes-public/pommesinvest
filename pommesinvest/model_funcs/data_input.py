@@ -229,6 +229,18 @@ def update_sensitivities(im, input_files):
             f"Invalid configuration given. 'sensitivity_parameter' "
             f"{im.sensitivity_parameter} is not implemented."
         )
+    if im.sensitivity_value not in ["-50%", "-25%", "+25%", "+50%"]:
+        if im.sensitivity_value == "None":
+            raise ValueError(
+                "'sensitivity_value' 'None' is only to be used if "
+                "no sensitivity is considered, "
+                "i.e. 'sensitivity_parameter' is 'None'."
+            )
+        else:
+            raise ValueError(
+                "Invalid value for 'sensitivity_value'. "
+                "Must be one of ['-50%', '-25%', '+25%', '+50%']"
+            )
     sensitivity = sensitivities[im.sensitivity_parameter]
 
     if isinstance(sensitivity, list):
