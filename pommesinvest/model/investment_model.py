@@ -260,10 +260,11 @@ def run_investment_model(config_file="./config.yml"):
 
     if im.extract_duals:
         power_prices.to_csv(
-            im.path_folder_output + getattr(im, "filename")
-            + '_power-prices.csv',
-            sep=',',
-            decimal='.'
+            im.path_folder_output
+            + getattr(im, "filename")
+            + "_power-prices.csv",
+            sep=",",
+            decimal=".",
         )
 
 

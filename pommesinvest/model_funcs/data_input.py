@@ -192,14 +192,68 @@ def parse_input_data(im):
     }
     input_files = {**input_files, **other_files}
 
-    # input_files = {
-    #     k: v + "_2020" for k, v in input_files.items()
-    # }
+    # Update files in case sensitivities are considered
+    if im.sensitivity_parameter != "None":
+        input_files = update_sensitivities(im, input_files)
 
     return {
         key: load_input_data(filename=name, im=im)
         for key, name in input_files.items()
     }
+
+
+def update_sensitivities(im, input_files):
+    """Update reference to files including respective sensitivities
+
+    Parameters
+    ----------
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+
+    input_files : dict
+        Dictionary of all input file names
+
+    Returns
+    -------
+    input_files : dict
+        Dictionary of all input files with file names
+        for considered sensitivity modified
+    """
+    sensitivities = {
+        "pv": "sources_renewables_ts",
+        "prices": ["costs_fuel_ts", "costs_emissions_ts"],
+        "consumption": "sinks_demand_el",
+    }
+    if im.sensitivity_parameter not in ["pv", "prices", "consumption"]:
+        raise ValueError(
+            f"Invalid configuration given. 'sensitivity_parameter' "
+            f"{im.sensitivity_parameter} is not implemented."
+        )
+    if im.sensitivity_value not in ["-50%", "-25%", "+25%", "+50%"]:
+        if im.sensitivity_value == "None":
+            raise ValueError(
+                "'sensitivity_value' 'None' is only to be used if "
+                "no sensitivity is considered, "
+                "i.e. 'sensitivity_parameter' is 'None'."
+            )
+        else:
+            raise ValueError(
+                "Invalid value for 'sensitivity_value'. "
+                "Must be one of ['-50%', '-25%', '+25%', '+50%']"
+            )
+    sensitivity = sensitivities[im.sensitivity_parameter]
+
+    if isinstance(sensitivity, list):
+        for value in sensitivity:
+            input_files[
+                value
+            ] = f"{input_files[value]}_sensitivity_{im.sensitivity_value}"
+    else:
+        input_files[
+            sensitivity
+        ] = f"{input_files[sensitivity]}_sensitivity_{im.sensitivity_value}"
+
+    return input_files
 
 
 def resample_input_data(input_data, im):

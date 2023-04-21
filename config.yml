@@ -47,7 +47,9 @@ control_parameters:
     save_production_results: True
     save_investment_results: True
     write_lp_file: False
-    extract_duals: False
+    extract_duals: True
+    sensitivity_parameter: "None"  # "None", "pv", "prices", "consumption"
+    sensitivity_value: "None"  # "None", "-50%", "-25%", "+25%", "+50%"
 
 # 2) Set model optimization time and frequency
 time_parameters:

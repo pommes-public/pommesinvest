@@ -21,6 +21,7 @@ import math
 
 import oemof.solph as solph
 import pandas as pd
+
 # constraints, views, models, network, processing
 from oemof.tools import logger
 
@@ -98,7 +99,7 @@ class InvestmentModel(object):
     solver_tmp_dir: str
         Directory for solver to store tmp files;
         Will be adjusted if set other than 'default'
-    
+
     fuel_cost_pathway :  str
         A predefined pathway for commodity cost development until 2050
 
@@ -216,7 +217,7 @@ class InvestmentModel(object):
     use_technology_specific_wacc: boolean
         If True, discriminate wacc among technologies, else use interest_value
         as wacc (social planner with ideal level-playing field)
-    
+
     activate_demand_response : boolean
         boolean control variable indicating whether to introduce
         demand response to the model
@@ -232,7 +233,7 @@ class InvestmentModel(object):
         A predefined demand response scenario to be modeled
         Options: '5', '50', '95', whereby '5' is the lower,
         i.e. rather pessimistic estimate
-    
+
     use_subset_of_delay_times : boolean
         If True, only allow for a subset of the given maximum delay time
         of demand response units. The allowed subset hereby is defined as
@@ -254,7 +255,25 @@ class InvestmentModel(object):
     extract_duals : boolean
         boolean control variable indicating whether to save dual values of bus
         balance constraint
-    
+
+    sensitivity_parameter: str
+        Parameter for which to consider sensitivities;
+        Supported sensitivities are
+        - "None": no sensitivity
+        - "PV": Different split between solar PV and wind onshore for Germany
+          (higher / lower PV generation)
+        - "prices": Combined variation of fuel and CO2 prices
+        - "consumption": variation of inflexible baseline consumption
+
+    sensitivity_value: str
+        Sensitivity to consider;
+        Supported values are
+        - "None": No sensitivity
+        - "-50%": 50% lower value compared to normal one
+        - "-25%": 25% lower value compared to normal one
+        - "+25%": 25% higher value compared to normal one
+        - "+50%": 50% higher value compared to normal one
+
     start_time : str
         A date string of format "YYYY-MM-DD hh:mm:ss" defining the start time
         of the simulation
@@ -322,6 +341,8 @@ class InvestmentModel(object):
         self.save_investment_results = None
         self.write_lp_file = None
         self.extract_duals = None
+        self.sensitivity_parameter = None
+        self.sensitivity_value = None
         self.start_time = None
         self.end_time = None
         self.optimization_timeframe = None
@@ -520,6 +541,11 @@ class InvestmentModel(object):
             f"fuel_price-{self.fuel_cost_pathway}_{self.fuel_price_shock}_"
             f"co2_price-{self.emissions_cost_pathway}"
         )
+        if self.sensitivity_parameter != "None":
+            filename += (
+                f"_sensitivity_{self.sensitivity_parameter}_"
+                f"{self.sensitivity_value}"
+            )
 
         setattr(self, "filename", filename)
         logger.define_logging(logfile=f"{filename}.log")
@@ -540,9 +566,15 @@ class InvestmentModel(object):
         else:
             dr_string = "Running a model WITHOUT DEMAND RESPONSE"
 
-        logging.info(dr_string)
+        if self.sensitivity_parameter != "None":
+            sensitivity_string = (
+                f"Considering PARAMETRIC SENSITIVITY for parameter "
+                f"{self.sensitivity_parameter}, altering the default "
+                f"values by {self.sensitivity_value}."
+            )
+            logging.info(sensitivity_string)
 
-        return dr_string
+        logging.info(dr_string)
 
     def build_simple_model(self):
         r"""Set up and return a simple model
