@@ -53,6 +53,7 @@ control_parameters:
     save_investment_results: True
     write_lp_file: False
     extract_duals: True
+    extract_other_countries_production: False
     sensitivity_parameter: "None"
     sensitivity_value: "None"
 

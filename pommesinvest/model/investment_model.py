@@ -206,6 +206,15 @@ def run_investment_model(config_file="./config.yml"):
         model_results = processing.results(im.om)
 
         dispatch_results = views.node(model_results, "DE_bus_el")["sequences"]
+        if im.extract_other_countries_production:
+            buses_el_views = [country + "_bus_el" for country in im.countries]
+            dispatch_results = pd.concat(
+                [
+                    views.node(model_results, bus_el)["sequences"]
+                    for bus_el in buses_el_views
+                ],
+                axis=1,
+            )
         investment_results = views.node(model_results, "DE_bus_el")[
             "period_scalars"
         ]
