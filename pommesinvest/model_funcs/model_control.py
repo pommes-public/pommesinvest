@@ -256,6 +256,10 @@ class InvestmentModel(object):
         boolean control variable indicating whether to save dual values of bus
         balance constraint
 
+    extract_other_countries_production : boolean
+        boolean control variable indicating whether to also extract dispatch
+        results for countries other than Germany
+
     sensitivity_parameter: str
         Parameter for which to consider sensitivities;
         Supported sensitivities are
@@ -341,6 +345,7 @@ class InvestmentModel(object):
         self.save_investment_results = None
         self.write_lp_file = None
         self.extract_duals = None
+        self.extract_other_countries_production = None
         self.sensitivity_parameter = None
         self.sensitivity_value = None
         self.start_time = None
