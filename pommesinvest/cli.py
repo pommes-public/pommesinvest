@@ -54,6 +54,7 @@ control_parameters:
     write_lp_file: False
     extract_duals: True
     extract_other_countries_production: False
+    results_rounding_precision: 2
     sensitivity_parameter: "None"
     sensitivity_value: "None"
 
@@ -61,7 +62,7 @@ control_parameters:
 time_parameters:
     start_time: "2017-01-01 00:00:00"
     end_time: "2017-01-02 23:00:00"
-    freq: "4H"
+    freq: "1H"
 
 # 3) Set input and output data paths
 input_output_parameters:

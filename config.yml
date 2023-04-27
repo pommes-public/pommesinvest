@@ -49,6 +49,7 @@ control_parameters:
     write_lp_file: False
     extract_duals: True
     extract_other_countries_production: False
+    results_rounding_precision: 2
     sensitivity_parameter: "None"  # "None", "pv", "prices", "consumption"
     sensitivity_value: "None"  # "None", "-50%", "-25%", "+25%", "+50%"
 
@@ -56,7 +57,7 @@ control_parameters:
 time_parameters:
     start_time: "2020-01-01 00:00:00"
     end_time: "2020-12-30 23:00:00"
-    freq: "24H"
+    freq: "1H"
 
 # 3) Set input and output data paths
 input_output_parameters:
