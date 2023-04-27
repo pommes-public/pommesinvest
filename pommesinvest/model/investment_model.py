@@ -250,6 +250,9 @@ def run_investment_model(config_file="./config.yml"):
         investment_results = pd.concat(investments_to_concat)
 
     if im.save_investment_results:
+        investment_results = investment_results.round(
+            im.results_rounding_precision
+        )
         investment_results.to_csv(
             im.path_folder_output
             + getattr(im, "filename")
@@ -259,6 +262,9 @@ def run_investment_model(config_file="./config.yml"):
         )
 
     if im.save_production_results:
+        dispatch_results = dispatch_results.round(
+            im.results_rounding_precision
+        )
         dispatch_results.to_csv(
             im.path_folder_output
             + getattr(im, "filename")
@@ -268,6 +274,7 @@ def run_investment_model(config_file="./config.yml"):
         )
 
     if im.extract_duals:
+        power_prices = power_prices.round(im.results_rounding_precision)
         power_prices.to_csv(
             im.path_folder_output
             + getattr(im, "filename")
