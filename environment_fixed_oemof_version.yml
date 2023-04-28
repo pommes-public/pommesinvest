@@ -1,0 +1,12 @@
+name: pommesinvest
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pip
+  - numpy
+  - pandas
+  - pip:
+      # TODO: Replace with release when available
+      - git+https://github.com/oemof/oemof-solph.git@01ffed7ae6503cd4486ace96b8415ac2da4a9527
+      - pyyaml
