@@ -248,7 +248,7 @@ def create_commodity_sources(input_data, im, node_dict):
     return node_dict
 
 
-def create_shortage_sources(input_data, node_dict):
+def create_shortage_sources(input_data, im, node_dict):
     r"""Create shortage sources and add them to the dict of nodes.
 
     Parameters
@@ -256,6 +256,9 @@ def create_shortage_sources(input_data, node_dict):
     input_data: :obj:`dict` of :class:`pd.DataFrame`
         The input data given as a dict of DataFrames
         with component names as keys
+
+    im : :class:`InvestmentModel`
+        The investment model that is considered
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Dictionary containing all nodes of the EnergySystem
@@ -275,6 +278,22 @@ def create_shortage_sources(input_data, node_dict):
                 )
             },
         )
+    if im.include_artificial_shortage_units:
+        for i, s in input_data["sources_shortage_el_artificial"].iterrows():
+            node_dict[i] = solph.components.Source(
+                label=i,
+                outputs={
+                    node_dict[s["to"]]: solph.flows.Flow(
+                        variable_costs=s["shortage_costs"],
+                        fix=np.array(
+                            input_data["sources_shortage_el_artificial_ts"][i][
+                                im.start_time : im.end_time
+                            ]
+                        ),
+                        nominal_value=s["maximum"],
+                    ),
+                },
+            )
 
     return node_dict
 
