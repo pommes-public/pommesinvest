@@ -240,6 +240,13 @@ class InvestmentModel(object):
         [1, 2, delay_time/2, delay_time] since this reflects short-, medium-
         and long-term shifting processes while limiting model complexity.
 
+    include_artificial_shortage_units: bool
+        If True, add artificial shortage units with a fixed profile to the
+        system. Their dimensioning is done in an ex post analysis. If you
+        seek to re-parameterize them, run once without and then create the
+        input by running the repective script of `pommesevaluation` as well as
+        `pommesdata`.
+
     save_production_results : boolean
         boolean control variable indicating whether to save the dispatch
         results of the model run to a .csv file
@@ -344,6 +351,7 @@ class InvestmentModel(object):
         self.demand_response_approach = None
         self.demand_response_scenario = None
         self.use_subset_of_delay_times = None
+        self.include_artificial_shortage_units = None
         self.save_production_results = None
         self.save_investment_results = None
         self.write_lp_file = None

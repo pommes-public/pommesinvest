@@ -78,6 +78,14 @@ def parse_input_data(im):
         "linking_transformers_ts": "linking_transformers_ts",
     }
 
+    if im.include_artificial_shortage_units:
+        components[
+            "sources_shortage_el_artificial"
+        ] = f"sources_el_artificial_{im.demand_response_scenario}"
+        hourly_time_series[
+            "sources_shortage_el_artificial_ts"
+        ] = f"sources_el_artificial_ts_{im.demand_response_scenario}"
+
     annual_time_series = {
         "transformers_exogenous_max_ts": "transformers_exogenous_max_ts",
         "costs_fuel_ts": (
@@ -400,7 +408,7 @@ def add_components(input_data, im):
     node_dict = create_commodity_sources(input_data, im, node_dict)
     if im.countries != ["DE"]:
         node_dict = create_linking_transformers(input_data, im, node_dict)
-    node_dict = create_shortage_sources(input_data, node_dict)
+    node_dict = create_shortage_sources(input_data, im, node_dict)
     node_dict = create_renewables(input_data, im, node_dict)
     node_dict = create_demand(input_data, im, node_dict)
 
