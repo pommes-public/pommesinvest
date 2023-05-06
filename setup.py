@@ -25,7 +25,7 @@ __author__ = [
     "Johannes Giehl",
     "Benjamin Grosse",
 ]
-__copyright__ = "Copyright 2021 pommes developer group"
+__copyright__ = "Copyright 2023 pommes developer group"
 __credits__ = [
     "Sophie Westphal",
     "Flora von Mikulicz-Radecki",
