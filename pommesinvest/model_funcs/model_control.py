@@ -756,7 +756,7 @@ class InvestmentModel(object):
             starting with period 0
         """
         years = sorted(list(set(getattr(datetimeindex, "year"))))
-        periods = {}
+        periods = []
         filter_series = datetimeindex.to_series()
         for number, year in enumerate(years):
             start = filter_series.loc[filter_series.index.year == year].min()
@@ -769,7 +769,7 @@ class InvestmentModel(object):
                     & (filter_series.index.month == 12)
                     & (filter_series.index.day != 31)
                 ].max()
-            periods[number] = pd.date_range(start, end, freq=self.freq)
+            periods.append(pd.date_range(start, end, freq=self.freq))
 
         return periods
 
