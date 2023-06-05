@@ -8,5 +8,5 @@ dependencies:
   - pandas
   - pip:
       # TODO: Replace with release when available
-      - git+https://github.com/oemof/oemof-solph.git@01ffed7ae6503cd4486ace96b8415ac2da4a9527
+      - git+https://github.com/oemof/oemof-solph.git@9627d126b81e6695f2e136742bc79c3f61aec84f
       - pyyaml

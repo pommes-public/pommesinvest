@@ -172,14 +172,14 @@ def resample_timeseries(
         )
 
     try:
-        original_freq = pd.infer_freq(timeseries.index, warn=True)
+        original_freq = pd.infer_freq(timeseries.index)
     except ValueError:
         original_freq = "AS"
 
     # Hack for problems with recognizing abolishing the time shift
     if not original_freq:
         try:
-            original_freq = pd.infer_freq(timeseries.index[:5], warn=True)
+            original_freq = pd.infer_freq(timeseries.index[:5])
         except ValueError:
             raise ValueError("Cannot detect frequency of time series!")
 

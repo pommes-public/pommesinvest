@@ -50,9 +50,9 @@ def adjust_datetime_index(periods):
 
     Parameters
     ----------
-    periods : dict
+    periods : list
         pd.date_ranges defining the time stamps for the respective period,
-        starting with period 0
+        starting with 0th period
 
     Returns
     -------
@@ -60,9 +60,9 @@ def adjust_datetime_index(periods):
         Actual datetime index of the model ignoring leap days
     """
     datetime_index = periods[0]
-    for period, timeindex in periods.items():
-        if period >= 1:
-            datetime_index = datetime_index.append(timeindex)
+    for number, period in enumerate(periods):
+        if number >= 1:
+            datetime_index = datetime_index.append(period)
 
     return datetime_index
 
@@ -756,7 +756,7 @@ class InvestmentModel(object):
             starting with period 0
         """
         years = sorted(list(set(getattr(datetimeindex, "year"))))
-        periods = {}
+        periods = []
         filter_series = datetimeindex.to_series()
         for number, year in enumerate(years):
             start = filter_series.loc[filter_series.index.year == year].min()
@@ -769,7 +769,7 @@ class InvestmentModel(object):
                     & (filter_series.index.month == 12)
                     & (filter_series.index.day != 31)
                 ].max()
-            periods[number] = pd.date_range(start, end, freq=self.freq)
+            periods.append(pd.date_range(start, end, freq=self.freq))
 
         return periods
 

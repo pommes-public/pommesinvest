@@ -240,7 +240,9 @@ def create_commodity_sources(input_data, im, node_dict):
                         .to_numpy()
                         * cs["emission_factors"]
                     ),
-                    emission_factor=cs["emission_factors"],
+                    custom_attributes={
+                        "emission_factor": cs["emission_factors"]
+                    },
                 )
             },
         )
