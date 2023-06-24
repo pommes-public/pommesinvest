@@ -1361,9 +1361,9 @@ def create_new_built_storages(input_data, im, node_dict):
                 ]
             )
         else:
-            invest_max_pump = 1e9
-            invest_max_turbine = 1e9
-            invest_max = 1e9
+            invest_max_pump = np.minimum(1e9, overall_maximum_pump)
+            invest_max_turbine = np.minimum(1e9, overall_maximum_turbine)
+            invest_max = np.minimum(1e9, overall_maximum)
 
         if im.use_technology_specific_wacc:
             interest_rate = input_data["wacc"].loc[
@@ -1435,12 +1435,13 @@ def create_new_built_storages(input_data, im, node_dict):
                 "fixed_costs_storages"
             ].loc[f"storage_el_{s['type']}", "fixed_costs_percent_per_year"]
 
-            invest_max_pump = annual_invest_limit_pump
-            invest_max_turbine = annual_invest_limit_turbine
-            invest_max = annual_invest_limit
-            invest_kwargs["inflow"]["maximum"] = invest_max_pump
-            invest_kwargs["outflow"]["maximum"] = invest_max_turbine
-            invest_kwargs["capacity"]["maximum"] = invest_max
+            if im.impose_investment_maxima:
+                invest_max_pump = annual_invest_limit_pump
+                invest_max_turbine = annual_invest_limit_turbine
+                invest_max = annual_invest_limit
+                invest_kwargs["inflow"]["maximum"] = invest_max_pump
+                invest_kwargs["outflow"]["maximum"] = invest_max_turbine
+                invest_kwargs["capacity"]["maximum"] = invest_max
 
             invest_kwargs["inflow"]["ep_costs"] = (
                 investment_expenses_power / s["efficiency_pump"]
