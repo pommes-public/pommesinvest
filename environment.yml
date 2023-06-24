@@ -7,6 +7,5 @@ dependencies:
   - numpy
   - pandas
   - pip:
-      # TODO: Replace with release when available
-      - git+https://github.com/oemof/oemof-solph.git@dev
+      - oemof.solph==0.5.1dev1
       - pyyaml
