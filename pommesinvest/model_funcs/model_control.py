@@ -240,6 +240,11 @@ class InvestmentModel(object):
         [1, 2, delay_time/2, delay_time] since this reflects short-, medium-
         and long-term shifting processes while limiting model complexity.
 
+    impose_investment_maxima : boolean
+        If True, impose periodical (i.e. annual) investment limits
+        per technology to reflect maximum industry & planning capabilities; 
+        if not, only overall potential limitation assumption applies
+
     include_artificial_shortage_units: bool
         If True, add artificial shortage units with a fixed profile to the
         system. Their dimensioning is done in an ex post analysis. If you
@@ -351,13 +356,14 @@ class InvestmentModel(object):
         self.demand_response_approach = None
         self.demand_response_scenario = None
         self.use_subset_of_delay_times = None
+        self.impose_investment_maxima = None
         self.include_artificial_shortage_units = None
         self.save_production_results = None
         self.save_investment_results = None
         self.write_lp_file = None
         self.extract_duals = None
-        self.results_rounding_precision = None
         self.extract_other_countries_production = None
+        self.results_rounding_precision = None
         self.sensitivity_parameter = None
         self.sensitivity_value = None
         self.start_time = None
@@ -550,13 +556,17 @@ class InvestmentModel(object):
             dr = "no_dr"
         else:
             dr = "with_dr"
+        if self.impose_investment_maxima:
+            maxima = ""
+        else:
+            maxima = "_no_annual_limit"
 
         filename = (
             f"investment_LP_start-{self.start_time[:10]}_"
             f"{self.optimization_timeframe}-years_{rh}_freq_{self.freq}_"
             f"{dr}_{self.demand_response_scenario}_"
             f"fuel_price-{self.fuel_cost_pathway}_{self.fuel_price_shock}_"
-            f"co2_price-{self.emissions_cost_pathway}"
+            f"co2_price-{self.emissions_cost_pathway}{maxima}"
         )
         if self.sensitivity_parameter != "None":
             filename += (
