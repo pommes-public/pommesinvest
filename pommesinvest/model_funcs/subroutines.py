@@ -1703,3 +1703,13 @@ def create_new_built_storages_myopic_horizon(
         )
 
     return node_dict, new_built_storage_labels
+
+
+def create_electric_vehicles():
+    """Create electric vehicles and add them to the dict of nodes
+
+    Electric vehicles may be inflexible which is effectively a fixed electricity
+    demand or flexible which is effectively modelled as a battery with
+    time-dependent state of charge limits.
+    """
+    pass
