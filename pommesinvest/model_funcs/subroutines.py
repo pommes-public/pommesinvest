@@ -1711,11 +1711,36 @@ def create_new_built_storages_myopic_horizon(
     return node_dict, new_built_storage_labels
 
 
-def create_electric_vehicles():
+def create_electric_vehicles(
+    input_data,
+    im,
+    node_dict,
+):
     """Create electric vehicles and add them to the dict of nodes
 
     Electric vehicles may be inflexible which is effectively a fixed electricity
     demand or flexible which is effectively modelled as a battery with
     time-dependent state of charge limits.
+
+    Parameters
+    ----------
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
+
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Dictionary containing all nodes of the EnergySystem
+
+    Returns
+    -------
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Modified dictionary containing all nodes of the EnergySystem
+        including the electric vehicle elements
     """
-    pass
+    for i, c in input_data["electric_vehicles"].iterrows():
+        pass
+
+    return node_dict
