@@ -1806,9 +1806,8 @@ def create_electric_vehicles(
                         nominal_value=c["nominal_value"],
                         fix=(
                             input_data["electric_vehicles_ts"].loc[
-                                im.start_time : im.end_time
-                            ],
-                            "driving".to_numpy(),
+                                im.start_time : im.end_time, "driving"
+                            ].to_numpy(),
                         ),
                     )
                 },
