@@ -1805,9 +1805,9 @@ def create_electric_vehicles(
                     node_dict[c["from"]]: solph.flows.Flow(
                         nominal_value=c["nominal_value"],
                         fix=(
-                            input_data["electric_vehicles_ts"].loc[
-                                im.start_time : im.end_time, "driving"
-                            ].to_numpy(),
+                            input_data["electric_vehicles_ts"]
+                            .loc[im.start_time : im.end_time, "driving"]
+                            .to_numpy()
                         ),
                     )
                 },
