@@ -64,6 +64,7 @@ from pommesinvest.model_funcs.helpers import make_directory_if_missing
 from pommesinvest.model_funcs.results_processing import (
     process_demand_response_results,
     filter_storage_results,
+    process_ev_bus_results,
     filter_european_country_results,
 )
 
@@ -245,6 +246,11 @@ def run_investment_model(config_file="./config.yml"):
                     )
                 )
                 dispatch_to_concat.append(processed_demand_response_results)
+            for bus in im.ev_buses:
+                processed_ev_bus_results = process_ev_bus_results(
+                    views.node(model_results, bus)["sequences"]
+                )
+                dispatch_to_concat.append(processed_ev_bus_results)
             dispatch_results = pd.concat(dispatch_to_concat, axis=1)
 
         investment_results = pd.concat(investments_to_concat)
