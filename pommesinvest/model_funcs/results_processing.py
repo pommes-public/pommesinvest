@@ -80,3 +80,22 @@ def filter_storage_results(results):
     filtered_results = results.loc[capacity_idx]
 
     return filtered_results
+
+
+def process_ev_bus_results(results):
+    """Filter the given electric vehicle bus results
+
+    Parameters
+    ----------
+    results : pd.DataFrame
+        The raw ev bus results
+
+    Returns
+    -------
+    filtered_results : pd.DataFrame
+        ev bus results excluding duals
+    """
+    ev_cols = [col for col in results.columns if col[0][1] != "None"]
+    filtered_results = results[ev_cols]
+
+    return filtered_results

@@ -242,7 +242,7 @@ class InvestmentModel(object):
 
     impose_investment_maxima : boolean
         If True, impose periodical (i.e. annual) investment limits
-        per technology to reflect maximum industry & planning capabilities; 
+        per technology to reflect maximum industry & planning capabilities;
         if not, only overall potential limitation assumption applies
 
     include_artificial_shortage_units: bool
@@ -539,6 +539,16 @@ class InvestmentModel(object):
             Potentially new-built storage units
         """
         setattr(self, "new_built_storages", new_built_storages)
+
+    def add_ev_buses(self, ev_buses):
+        """Append the information on electric vehicle buses to the model
+
+        Parameters
+        ----------
+        ev_buses : list
+            Buses for connecting electric vehicle components
+        """
+        setattr(self, "ev_buses", ev_buses)
 
     def initialize_logging(self):
         """Initialize logging by deriving a filename from the configuration"""

@@ -199,6 +199,11 @@ def parse_input_data(im):
         hourly_time_series[
             "electric_vehicles_ts"
         ] = f"electric_vehicles_ts_{im.demand_response_scenario}"
+        ev_buses = load_input_data(
+            filename=components["electric_vehicles"], im=im
+        )
+        ev_buses = list(ev_buses.loc[ev_buses["type"] == "bus"].index.values)
+        im.add_ev_buses(ev_buses)
 
     # Combine all files
     input_files = {
