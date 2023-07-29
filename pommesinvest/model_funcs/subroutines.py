@@ -1793,16 +1793,35 @@ def create_electric_vehicles(
                 balanced=True,
             )
         elif component_type == "sink":
-            node_dict[i] = solph.components.Sink(
+            if not "_excess" in i:
+                node_dict[i] = solph.components.Sink(
+                    label=i,
+                    inputs={
+                        node_dict[c["from"]]: solph.flows.Flow(
+                            nominal_value=c["nominal_value"],
+                            fix=(
+                                input_data["electric_vehicles_ts"]
+                                .loc[im.start_time : im.end_time, "driving"]
+                                .to_numpy()
+                            ),
+                        )
+                    },
+                )
+            else:
+                node_dict[i] = solph.components.Sink(
+                    label=i,
+                    inputs={
+                        node_dict[c["from"]]: solph.flows.Flow(
+                            variable_costs=c["variable_costs"]
+                        )
+                    },
+                )
+        elif component_type == "source":
+            node_dict[i] = solph.components.Source(
                 label=i,
-                inputs={
-                    node_dict[c["from"]]: solph.flows.Flow(
-                        nominal_value=c["nominal_value"],
-                        fix=(
-                            input_data["electric_vehicles_ts"]
-                            .loc[im.start_time : im.end_time, "driving"]
-                            .to_numpy()
-                        ),
+                outputs={
+                    node_dict[c["to"]]: solph.flows.Flow(
+                        variable_costs=c["variable_costs"]
                     )
                 },
             )
