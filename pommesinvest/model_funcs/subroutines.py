@@ -169,6 +169,9 @@ def create_linking_transformers(input_data, im, node_dict):
                             max=input_data["linking_transformers_annual_ts"]
                             .loc[im.start_time : im.end_time, i]
                             .to_numpy(),
+                            variable_costs=input_data[
+                                "costs_operation_linking_transformers_ts"
+                            ].loc[im.start_time : im.end_time, "values"],
                         )
                     },
                     outputs={node_dict[l["to"]]: solph.Flow()},
@@ -188,6 +191,9 @@ def create_linking_transformers(input_data, im, node_dict):
                             max=input_data["linking_transformers_ts"]
                             .loc[im.start_time : im.end_time, i]
                             .to_numpy(),
+                            variable_costs=input_data[
+                                "costs_operation_linking_transformers_ts"
+                            ].loc[im.start_time : im.end_time, "values"],
                         )
                     },
                     outputs={node_dict[l["to"]]: solph.Flow()},
