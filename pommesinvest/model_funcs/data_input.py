@@ -102,6 +102,9 @@ def parse_input_data(im):
             f"variable_costs_storages_"
             f"{im.flexibility_options_scenario}%_nominal"
         ),
+        "costs_operation_linking_transformers_ts": (
+            "costs_operation_linking_transformers_nominal_indexed_ts"
+        ),
         "costs_investment": (
             f"investment_expenses_{im.flexibility_options_scenario}%_nominal"
         ),
@@ -284,6 +287,7 @@ def resample_input_data(input_data, im):
         "costs_emissions_ts",
         "costs_operation_ts",
         "costs_operation_storages_ts",
+        "costs_operation_linking_transformers_ts",
         "linking_transformers_annual_ts",
         "storages_el_exogenous_max_ts",
     ]
