@@ -1,4 +1,5 @@
 import pandas as pd
+from oemof.solph import views
 
 
 def process_demand_response_results(results):
@@ -80,3 +81,65 @@ def filter_storage_results(results):
     filtered_results = results.loc[capacity_idx]
 
     return filtered_results
+
+
+def filter_european_country_results(im, results):
+    """Filter values for European countries from dispatch results
+
+    Exclude dispatch for linking transformers. These are already accounted
+    for by considering the German electricity bus. Since transmission losses
+    are neglected in favor of small transportation costs, flow values are equal.
+
+    Parameters
+    ----------
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+
+    results : pd.DataFrame
+        The raw storage results
+
+    Returns
+    -------
+    filtered_results : pd.DataFrame
+        dispatch results of European countries excluding links to Germany
+    """
+    buses_el_views = [
+        country + "_bus_el" for country in im.countries if country != "DE"
+    ]
+    filtered_results = pd.concat(
+        [
+            filter_dispatch(
+                views.node(results, bus_el)["sequences"],
+                exclude=["link_DE", "DE_link"],
+            )
+            for bus_el in buses_el_views
+        ],
+        axis=1,
+    )
+    return filtered_results
+
+
+def filter_dispatch(df, exclude):
+    """Filter data frame for columns not containing substrings from exclude
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to be filtered
+
+    exclude : list of str
+        List of strings to exclude if they occur in DataFrames columns
+
+    Returns
+    -------
+    df : pd.DataFrame
+        filtered DataFrame excluding
+    """
+    cols_to_drop = [
+        col
+        for col in df.columns
+        for substring in exclude
+        if substring in col[0][0] or substring in col[0][1]
+    ]
+
+    return df.drop(columns=cols_to_drop)

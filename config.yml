@@ -44,12 +44,12 @@ control_parameters:
     demand_response_scenario: "50"
     use_subset_of_delay_times: False
     impose_investment_maxima: True
-    include_artificial_shortage_units: True
+    include_artificial_shortage_units: False
     save_production_results: True
     save_investment_results: True
     write_lp_file: False
     extract_duals: True
-    extract_other_countries_production: False
+    extract_other_countries_production: True
     results_rounding_precision: 2
     sensitivity_parameter: "None"  # "None", "pv", "prices", "consumption"
     sensitivity_value: "None"  # "None", "-50%", "-25%", "+25%", "+50%"
