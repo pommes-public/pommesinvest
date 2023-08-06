@@ -11,19 +11,19 @@ Model description
 
 Feel free to directly jump to the section of interest.
 
-The **dispatch variant** of the power market model *POMMES* ``pommesdispatch``
-enables the user to simulate the **dispatch of backup power plants,
-storages as well as demand response units for the Federal Republic of Germany**
-for an arbitrary year or timeframe between 2017 and 2030.
+The **investment variant** of the power market model *POMMES* ``pommesinvest``
+enables the user to optimize the **investments and dispatch of backup power plants, storages as well as demand response units for the Federal Republic of Germany**
+for long-term time frames spanning from 2020 to up to 2045 (or even 2050).
 The dispatch of renewable power plants is exogenously determined
 by normalized infeed time series which are multiplied with capacity values
-(maximum capacities for foreign countries, installed ones for Germany).
+(maximum capacities for foreign countries, installed ones for Germany). Also,
+Investments for countries other than Germany are exogenously given and for these countries,
+only the dispatch of capacities is optimized.
 The models' overall goal is to minimize power system costs
 occurring from wholesale markets, whereby no network constraints
 are considered except for the existing bidding zone configuration
 used for modeling electricity exchange.
-Thus, the model purpose is to simulate **dispatch decisions**
-and the resulting **day-ahed market prices**.
+Thus, the model purpose is to simulate **investments and dispatch decisions**.
 
 You can find the following information on the subpages:
 
