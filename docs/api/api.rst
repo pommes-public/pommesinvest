@@ -20,4 +20,5 @@ pommesinvest.model_funcs
    api_data_input
    api_helpers
    api_model_control
+   api_processing
    api_subroutines
