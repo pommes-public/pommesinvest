@@ -8,7 +8,7 @@ pommesinvest.model
    :maxdepth: 1
    :caption: Contents:
 
-   api_dispatch_model
+   api_investment_model
 
 pommesinvest.model_funcs
 -------------------------

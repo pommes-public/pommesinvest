@@ -140,7 +140,7 @@ class InvestmentModel(object):
 
         .. csv-table:: Pathways and explanations
             :header: "pathway", "explanation", "description"
-            :widths: 10 45 45
+            :widths: 10, 45, 45
 
             "Fit_for_55_split_high", "| Emissions split according to
             | Fit for 55 split between
@@ -242,7 +242,7 @@ class InvestmentModel(object):
 
     impose_investment_maxima : boolean
         If True, impose periodical (i.e. annual) investment limits
-        per technology to reflect maximum industry & planning capabilities; 
+        per technology to reflect maximum industry & planning capabilities;
         if not, only overall potential limitation assumption applies
 
     include_artificial_shortage_units: bool
