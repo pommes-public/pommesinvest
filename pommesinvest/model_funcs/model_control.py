@@ -130,10 +130,10 @@ class InvestmentModel(object):
 
         .. csv-table:: Price shocks and explanations
             :header: "price shock", "explanation"
-            :widths: 20 80
+            :widths: 20, 80
 
             "high", "price peaks in 2026 and remains high until around 2030"
-            "low"", "price quickly stabilizes and reaches pre-war levels by 2026"
+            "low", "price quickly stabilizes and reaches pre-war levels by 2026"
 
     emissions_cost_pathway : str
         A predefined pathway for emissions cost development until 2030 or 2050
