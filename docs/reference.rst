@@ -30,7 +30,7 @@ Modules
 * ``data_input.py``: Holds functions to parse input data from .csv files and to
   create oemof.solph components (see
   `oemof.solph's user's guide <https://oemof-solph.readthedocs.io/en/latest/usage.html#>`_)
-  out of it. Optionally includes an emissions limit.
+  out of it. Optionally includes an emissions pathway or budget limit.
 * ``subroutines.py``: Includes all the functions to actually build the
   oemof.solph components given the provided input data. Is imported in the
   module ``data_input.py``.
@@ -38,6 +38,8 @@ Modules
   that are imported in ``model_control.py`` resp. ``data_input.py`` in order
   to perform some calculations not directly related to the actual mathematical
   model, but facilitating its setup and parameterization.
+* ```results_processing.py`` contains some routines for filtering and aggregating
+  results data before it is written to file.
 
 For an in-depth documentation of all modules, functions, classes and methods,
 see the :doc:`api/api`.
