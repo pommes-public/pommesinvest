@@ -28,14 +28,14 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-run_pommes_dispatch = "pommesinvest.cli:run_pommes_invest"
+run_pommes_invest = "pommesinvest.cli:run_pommes_invest"
 
 [tool.poetry.extras]
 dev = ["pytest", "sphinx", "sphinx_rtd_theme", "sphinx_copybutton"]
 
 [tool.poetry.urls]
-"Changelog" = "https://pommesdispatch.readthedocs.io/en/latest/changelog.html"
-"Issue Tracker" = "https://github.com/pommes-public/pommesdispatch/issues"
+"Changelog" = "https://pommesinvest.readthedocs.io/en/latest/changelog.html"
+"Issue Tracker" = "https://github.com/pommes-public/pommesinvest/issues"
 
 [tool.black]
 line-length = 79

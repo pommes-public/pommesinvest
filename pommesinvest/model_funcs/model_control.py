@@ -130,17 +130,17 @@ class InvestmentModel(object):
 
         .. csv-table:: Price shocks and explanations
             :header: "price shock", "explanation"
-            :widths: 20 80
+            :widths: 20, 80
 
             "high", "price peaks in 2026 and remains high until around 2030"
-            "low"", "price quickly stabilizes and reaches pre-war levels by 2026"
+            "low", "price quickly stabilizes and reaches pre-war levels by 2026"
 
     emissions_cost_pathway : str
         A predefined pathway for emissions cost development until 2030 or 2050
 
         .. csv-table:: Pathways and explanations
             :header: "pathway", "explanation", "description"
-            :widths: 10 45 45
+            :widths: 10, 45, 45
 
             "Fit_for_55_split_high", "| Emissions split according to
             | Fit for 55 split between
@@ -242,7 +242,7 @@ class InvestmentModel(object):
 
     impose_investment_maxima : boolean
         If True, impose periodical (i.e. annual) investment limits
-        per technology to reflect maximum industry & planning capabilities; 
+        per technology to reflect maximum industry & planning capabilities;
         if not, only overall potential limitation assumption applies
 
     include_artificial_shortage_units: bool

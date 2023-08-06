@@ -25,7 +25,7 @@ __author__ = [
     "Johannes Giehl",
     "Benjamin Grosse",
 ]
-__copyright__ = "Copyright 2021 pommes developer group"
+__copyright__ = "Copyright 2023 pommes developer group"
 __credits__ = [
     "Sophie Westphal",
     "Flora von Mikulicz-Radecki",
@@ -50,13 +50,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="pommesinvest",
     version=get_version("pommesinvest/__init__.py"),
-    description="A bottom-up fundamental power market model "
+    description="A bottom-up fundamental investment model "
     "for investments in the German electricity sector",
     long_description=long_description,
     keywords=[
         "power market",
         "fundamental model",
-        "dispatch",
+        "investment",
         "power price",
         "oemof.solph",
     ],
@@ -68,7 +68,7 @@ setup(
     packages=find_packages(where=""),
     entry_points={
         "console_scripts": [
-            "run_pommes_invest=pommesinvest.cli:run_pommes_dispatch"
+            "run_pommes_invest=pommesinvest.cli:run_pommes_invest"
         ],
     },
     classifiers=[
