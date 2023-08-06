@@ -17,8 +17,8 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-project = "pommesdispatch"
-copyright = "2021, pommes developer group"
+project = "pommesinvest"
+copyright = "2023, pommes developer group"
 author = "pommes developer group"
 
 # -- General configuration ---------------------------------------------------
