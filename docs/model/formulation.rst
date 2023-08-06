@@ -6,8 +6,6 @@ Mathematical formulation
 
 All constraints formulations can be found in the
 `oemof.solph documentation <https://oemof-solph.readthedocs.io/en/latest/reference/oemof.solph.html>`_.
-We'll provide a complete mathematical description for the parts we
-used here soon.
 
 Nomenclature
 ++++++++++++
@@ -16,40 +14,50 @@ Nomenclature
     :header: **name**, **type**, **description**
     :widths: 15, 15, 70
 
-    ":math:`N`", "set", "| all nodes of the energy system.
+    ":math:`N`", "set", "| all components of the energy system.
     | This comprises Sources, Sinks, Buses, Transformers,
     | Generic Storages and optionally DSMSinks"
     ":math:`T`", "set", "| all time steps within the optimization timeframe
     | (and time increment, i.e. frequency) chosen"
+    ":math:`P`", "set", "| all periods (i.e. years) within the optimization timeframe
+    | chosen"
+    ":math:`PT`", "set", "| All periods and time steps, whereby the first value
+    | denotes the period and the second one the time step"
     ":math:`F`", "set", "| all flows of the energy system.
     | A flow is a directed connection between node A and B
-    | and has a value (i.e. capacity flow) for every time step"
+    | and has a (non-negative) value (i.e. capacity flow) for every time step"
+    ":math:`IF`", "set", "| all flows or nodes of the energy system that can be invested into"
     ":math:`TF`", "set", "all transformers (conversion units, such as generators)"
-    ":math:`PGF`", "set", "all flows imposing a limit to the positive gradient"
-    ":math:`NGF`", "set", "all flows imposing a limit to the negative gradient"
-    ":math:`B`", "set", "all buses (fictious busbars to connect capacity resp. energy flows)"
+    ":math:`B`", "set", "all buses (fictitious bus bars to connect capacity resp. energy flows)"
     ":math:`S`", "set", "all storage units"
     ":math:`I(n)`", "set", "all inputs for node n"
     ":math:`O(n)`", "set", "all outputs for node n"
-    ":math:`f(i,o,t)`", "variable", "Flow from node i (input) to node o (output) at time step t"
+    ":math:`P_{invest}(n, p)`", "variable", "Investment into new capacity for node n in period p"
+    ":math:`P_{total}(n, p)`", "variable", "total installed capacity for node n in period p"
+    ":math:`P_{old}(n, p)`", "variable", "old installed capacity for node n to be decommissioned at the beginning of period p"
+    ":math:`P_{old,exo}(n, p)`", "variable", "| old installed capacity from exogenous investments,
+    | i.e. from capacity that has initially been existing, for node n to be decommissioned at the beginning of period p"
+    ":math:`P_{old,end}(n, p)`", "variable", "| old installed capacity from endogenous investments,
+    | i.e. from investements that have been chosen by the optimization model and reached their lifetime
+    | within the optimization time frame, for node n to be decommissioned at the beginning of period p"
+    ":math:`f(i,o,p,t)`", "variable", "Flow from node i (input) to node o (output) in period p and at time step t"
     ":math:`C`", "variable", "system costs"
-    ":math:`p_{DE}(t)`", "variable", "power price for Germany"
-    ":math:`P_{i}(n, t)`", "variable", "inflow into transformer n at time step t"
-    ":math:`P_{o}(n, t)`", "variable", "outflow from transformer n at time step t"
+    ":math:`P_{i}(n, p, t)`", "variable", "inflow into transformer n in period p and at time step t"
+    ":math:`P_{o}(n, p, t)`", "variable", "outflow from transformer n in period p and at time step t"
     ":math:`E(s, t)`", "variable", "energy currently stored in storage s"
+    ":math:`A(c_{invest}(n, p, l, i)`", "parameter", "| annualised investment costs for investments into node n
+    | in period p, with lifetime l and interest rate i"
+    ":math:`i`", "parameter", "| interest rate (varied per technology)"
+    ":math:`dr`", "parameter", "| discount rate (same accross all technologies)"
     ":math:`c_{var}(i, o, t)`", "parameter", "variable costs for flow from input i to output o at time step t"
     ":math:`\tau(t)`", "parameter", "time increment of the model for time step t"
     ":math:`D_{DE}(t)`", "parameter", "total load (for Germany)"
     ":math:`\eta_{o}(n, t)`", "parameter", "conversion efficiency for outflow"
     ":math:`\eta_{i}(n, t)`", "parameter", "conversion efficiency for inflow"
-    ":math:`\Delta P_{pos}(i, o, t)`", "parameter", "| maximum allowed positive gradient for flow from input i to output o
-    | at time step t (transition from t-1 to t)"
-    ":math:`\Delta P_{neg}(i, o, t)`", "parameter", "| maximum allowed negative gradient for flow from input i to output o
-    | at time step t (transition from t-1 to t)"
     ":math:`P_{nom}(i, o)`", "parameter", "| installed capacity (all except RES outside Germany)
-    | or maximum achievable output value (RES outside Germany)"
-    ":math:`f_{min}(i, o, t)`", "parameter", "normalized minimum output for flow from input i to output o"
-    ":math:`f_{max}(i, o, t)`", "parameter", "normalized maximum output for flow from input i to output o"
+    | or maximum achievable output value (RES outside Germany) for exogenously defined capacities"
+    ":math:`f_{min}(i, o, p, t)`", "parameter", "normalized minimum output for flow from input i to output o"
+    ":math:`f_{max}(i, o, p, t)`", "parameter", "normalized maximum output for flow from input i to output o"
     ":math:`E_{nom}(s)`", "parameter", "| nominal capacity of storage s (maximum achievable capacity
     | based on historic utilization, not the installed one)"
     ":math:`E_{min}(s, t)`", "parameter", "minimum allowed storage level for storage s"
@@ -57,14 +65,14 @@ Nomenclature
     ":math:`\beta(s, t)`", "parameter", "fraction of lost energy as share of :math:`E(s, t)`"
     ":math:`\gamma(s, t)`", "parameter", "fixed loss of energy relative to :math:`E_{nom}(s)` per time unit"
     ":math:`\delta(s, t)`", "parameter", "absolute fixed loss of energy per time unit"
-    ":math:`\dot{E}_i(s, t)`", "parameter", "energy flowing into storage s at time step t"
-    ":math:`\dot{E}_o(s, t)`", "parameter", "energy extracted from storage s at time step t"
+    ":math:`\dot{E}_i(s, p, t)`", "parameter", "energy flowing into storage s in period p and at time step t"
+    ":math:`\dot{E}_o(s, p, t)`", "parameter", "energy extracted from storage s in period p and at time step t"
     ":math:`\eta_i(s, t)`", "parameter", "conversion factor (i.e. efficiency) of storage s for storing energy"
     ":math:`\eta_o(s, t)`", "parameter", "| conversion factor (i.e. efficiency) of storage s for withdrawing
     | stored energy"
     ":math:`t_u`", "parameter", "time unit of losses :math:`\beta(t)`, :math:`\gamma(t)`, :math:`\delta(t)` and time increment :math:`\tau(t)`"
     ":math:`ef(i, o)`", "parameter", "emission factor in :math:`\frac {t \space CO_2}{MWh}`"
-    ":math:`EL`", "parameter", "overall emission linit in :math:`t \space CO_2`"
+    ":math:`EL`", "parameter", "overall emission limit in :math:`t \space CO_2`"
 
 
 Target function
@@ -73,12 +81,28 @@ The target function is build together by the ``_objective_expression`` terms of 
 oemof.solph components used (`see the oemof.solph.models module <https://github.com/oemof/oemof-solph/blob/dev/src/oemof/solph/models.py>`_):
 
 
-System costs: sum of the costs for all flows (commodity / fuel, emissions and operation costs):
+System costs: Sum of
+
+    * annualised investment costs for flows that can be invested into,
+    * fixed costs for flows associated with a fixed costs value as well as
+    * variable costs for all flows (commodity / fuel, emissions and operation costs):
 
 .. math::
 
-    & Min \space C = \sum_{(i,o)} \sum_t f(i, o, t) \cdot c_{var}(i, o, t) \\
-    & \forall \space (i, o) \in \mathrm{F}, \space t \in \mathrm{T}
+    & Min \space C = (\sum_{n} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l, i) \cdot l \\
+    & + (\sum_{pp=p}^{p+l} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \\
+    & + \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot c_{var}(i, o, t)) \cdot DF^{-p} \\
+    & \forall \space n \in \mathrm{IF}, \space (i, o) \in \mathrm{F},
+    \space p \in \textrm{P}, \space t \in \mathrm{T}
+
+whereby
+
+.. math::
+
+    & A(c_{invest}(n, p), l, i) = c_{invest}(n, p) \cdot
+    \frac {(1+i)^l \cdot i} {(1+i)^l - 1} \\
+    & \\
+    & DF=(1+dr)
 
 Constraints of the core model
 +++++++++++++++++++++++++++++
