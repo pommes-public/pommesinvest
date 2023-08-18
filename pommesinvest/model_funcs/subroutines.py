@@ -1751,10 +1751,16 @@ def create_electric_vehicles(
             outflow_args = {"nominal_value": c["nominal_value"]}
             if "_cc" in i:
                 outflow_args["max"] = (
-                    input_data["electric_vehicles_ts"]
-                    .loc[im.start_time : im.end_time, "cc_avail"]
-                    .to_numpy()
-                )
+                    (
+                        input_data["electric_vehicles_ts"].loc[
+                            im.start_time : im.end_time, "cc_avail"
+                        ]
+                    )
+                    * input_data["electric_vehicles_scaling_factors"].loc[
+                        im.start_time : im.end_time,
+                        im.flexibility_options_scenario,
+                    ]
+                ).to_numpy()
             elif "_uc" in i:
                 outflow_args["fix"] = (
                     input_data["electric_vehicles_ts"]
