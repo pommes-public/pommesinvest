@@ -1756,11 +1756,8 @@ def create_electric_vehicles(
                             im.start_time : im.end_time, "cc_avail"
                         ]
                     )
-                    * input_data["electric_vehicles_scaling_factors"].loc[
-                        im.start_time : im.end_time,
-                        im.flexibility_options_scenario,
-                    ]
                 ).to_numpy()
+                outflow_args["variable_costs"] = c["variable_costs"]
             elif "_uc" in i:
                 outflow_args["fix"] = (
                     input_data["electric_vehicles_ts"]
