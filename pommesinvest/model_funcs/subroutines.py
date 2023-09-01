@@ -1747,7 +1747,7 @@ def create_electric_vehicles(
                 outflow_args["max"] = (
                     (
                         input_data["electric_vehicles_ts"].loc[
-                            im.start_time : im.end_time, "cc_avail"
+                            im.start_time : im.end_time, c["time_series"]
                         ]
                     )
                 ).to_numpy()

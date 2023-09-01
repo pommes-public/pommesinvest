@@ -199,9 +199,6 @@ def parse_input_data(im):
         hourly_time_series[
             "electric_vehicles_ts"
         ] = f"electric_vehicles_ts_{im.demand_response_scenario}"
-        hourly_time_series["electric_vehicles_scaling_factors"] = (
-            "electric_vehicles_scaling_factor"
-        )
         ev_buses = load_input_data(
             filename=components["electric_vehicles"], im=im
         )
@@ -343,7 +340,6 @@ def resample_input_data(input_data, im):
                 "sinks_dr_el_ava_pos_ts",
                 "sinks_dr_el_ava_neg_ts",
                 "electric_vehicles_ts",
-                "electric_vehicles_scaling_factors",
             ]
         )
         demand_response_potential_columns = [
