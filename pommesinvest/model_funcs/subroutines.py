@@ -1742,20 +1742,14 @@ def create_electric_vehicles(
     for i, c in input_data["electric_vehicles"].iterrows():
         component_type = c["type"]
         if component_type == "transformer":
-            outflow_args = {"nominal_value": c["nominal_value"]}
-            if "_cc" in i:
-                outflow_args["max"] = (
-                    (
-                        input_data["electric_vehicles_ts"].loc[
-                            im.start_time : im.end_time, c["time_series"]
-                        ]
-                    )
-                ).to_numpy()
-                outflow_args["variable_costs"] = c["variable_costs"]
-            elif "_uc" in i:
+            outflow_args = {
+                "nominal_value": c["nominal_value"],
+                "variable_costs": c["variable_costs"],
+            }
+            if "_uc" in i:
                 outflow_args["fix"] = (
                     input_data["electric_vehicles_ts"]
-                    .loc[im.start_time : im.end_time, "uc_avail"]
+                    .loc[im.start_time : im.end_time, c["time_series"]]
                     .to_numpy()
                 )
             node_dict[i] = solph.components.Transformer(
@@ -1769,8 +1763,24 @@ def create_electric_vehicles(
         elif component_type == "storage":
             node_dict[i] = solph.components.GenericStorage(
                 label=i,
-                inputs={node_dict[c["from"]]: solph.flows.Flow()},
-                outputs={node_dict[c["to"]]: solph.flows.Flow()},
+                inputs={
+                    node_dict[c["from"]]: solph.flows.Flow(
+                        nominal_value=c["inflow_power"],
+                        variable_costs=c["variable_costs"],
+                        max=(
+                            input_data["electric_vehicles_ts"].loc[
+                                im.start_time : im.end_time,
+                                # Ugly hack, since list is rendered as string
+                                c["time_series"].split(",")[0][2:-1],
+                            ]
+                        ).to_numpy(),
+                    )
+                },
+                outputs={
+                    node_dict[c["to"]]: solph.flows.Flow(
+                        variable_costs=c["variable_costs"]
+                    )
+                },
                 nominal_storage_capacity=c["nominal_value"],
                 # storage level indexed in TIMEPOINTS
                 max_storage_level=(
@@ -1778,7 +1788,7 @@ def create_electric_vehicles(
                     .loc[
                         im.start_time : f"{int(im.end_time[:4])+1}"
                         f"-01-01 00:00:00",
-                        "soc_upper",
+                        c["time_series"].split(",")[2][2:-2],
                     ]
                     .to_numpy()
                 ),
@@ -1787,16 +1797,16 @@ def create_electric_vehicles(
                     .loc[
                         im.start_time : f"{int(im.end_time[:4])+1}"
                         f"-01-01 00:00:00",
-                        "soc_lower",
+                        c["time_series"].split(",")[1][2:-1],
                     ]
                     .to_numpy()
                 ),
-                inflow_conversion_factor=1,
-                outflow_conversion_factor=1,
+                inflow_conversion_factor=c["efficiency_el"],
+                outflow_conversion_factor=c["efficiency_discharging_el"],
                 balanced=True,
             )
         elif component_type == "sink":
-            if not "_excess" in i:
+            if "_uc" not in i:
                 node_dict[i] = solph.components.Sink(
                     label=i,
                     inputs={
@@ -1804,7 +1814,10 @@ def create_electric_vehicles(
                             nominal_value=c["nominal_value"],
                             fix=(
                                 input_data["electric_vehicles_ts"]
-                                .loc[im.start_time : im.end_time, "driving"]
+                                .loc[
+                                    im.start_time : im.end_time,
+                                    c["time_series"],
+                                ]
                                 .to_numpy()
                             ),
                         )
@@ -1812,22 +1825,9 @@ def create_electric_vehicles(
                 )
             else:
                 node_dict[i] = solph.components.Sink(
-                    label=i,
-                    inputs={
-                        node_dict[c["from"]]: solph.flows.Flow(
-                            variable_costs=c["variable_costs"]
-                        )
-                    },
+                    label=i, inputs={node_dict[c["from"]]: solph.flows.Flow()}
                 )
-        elif component_type == "source":
-            node_dict[i] = solph.components.Source(
-                label=i,
-                outputs={
-                    node_dict[c["to"]]: solph.flows.Flow(
-                        variable_costs=c["variable_costs"]
-                    )
-                },
-            )
+
         else:
             raise ValueError(
                 f"Invalid electric vehicle component type: {component_type}."
