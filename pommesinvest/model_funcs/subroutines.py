@@ -1758,6 +1758,19 @@ def create_electric_vehicles(
                     .loc[im.start_time : im.end_time, c["time_series"]]
                     .to_numpy()
                 )
+                outflow_args["variable_costs"] = (
+                    input_data["costs_operation_storages_ts"].loc[
+                        im.start_time : im.end_time,
+                        f"storage_el_battery",
+                    ]
+                    * 2  # inflow and outflow!
+                ).to_numpy()
+            elif "_cc_bidirectional" in i:
+                outflow_args["max"] = (
+                    input_data["electric_vehicles_ts"].loc[
+                        im.start_time : im.end_time, c["time_series"]
+                    ]
+                ).to_numpy()
             node_dict[i] = solph.components.Transformer(
                 label=i,
                 inputs={node_dict[c["from"]]: solph.flows.Flow()},
@@ -1772,11 +1785,16 @@ def create_electric_vehicles(
                 inputs={
                     node_dict[c["from"]]: solph.flows.Flow(
                         nominal_value=c["inflow_power"],
-                        variable_costs=c["variable_costs"],
+                        variable_costs=(
+                            input_data["costs_operation_storages_ts"].loc[
+                                im.start_time : im.end_time,
+                                f"storage_el_battery",
+                            ]
+                        ).to_numpy(),
                         max=(
                             input_data["electric_vehicles_ts"].loc[
                                 im.start_time : im.end_time,
-                                # Ugly hack, since list is rendered as string
+                                # cc avail; hack - list is rendered as string
                                 c["time_series"].split(",")[0][2:-1],
                             ]
                         ).to_numpy(),
@@ -1784,7 +1802,20 @@ def create_electric_vehicles(
                 },
                 outputs={
                     node_dict[c["to"]]: solph.flows.Flow(
-                        variable_costs=c["variable_costs"]
+                        nominal_value=c["outflow_power"],
+                        variable_costs=(
+                            input_data["costs_operation_storages_ts"].loc[
+                                im.start_time : im.end_time,
+                                f"storage_el_battery",
+                            ]
+                        ).to_numpy(),
+                        max=(
+                            input_data["electric_vehicles_ts"].loc[
+                                im.start_time : im.end_time,
+                                # soc upper; hack - list is rendered as string
+                                c["time_series"].split(",")[2][2:-2],
+                            ]
+                        ).to_numpy(),
                     )
                 },
                 nominal_storage_capacity=c["nominal_value"],
@@ -1794,6 +1825,7 @@ def create_electric_vehicles(
                     .loc[
                         im.start_time : f"{int(im.end_time[:4])+1}"
                         f"-01-01 00:00:00",
+                        # soc upper; hack - list is rendered as string
                         c["time_series"].split(",")[2][2:-2],
                     ]
                     .to_numpy()
@@ -1803,6 +1835,7 @@ def create_electric_vehicles(
                     .loc[
                         im.start_time : f"{int(im.end_time[:4])+1}"
                         f"-01-01 00:00:00",
+                        # soc lower; hack - list is rendered as string
                         c["time_series"].split(",")[1][2:-1],
                     ]
                     .to_numpy()
