@@ -637,7 +637,7 @@ class InvestmentModel(object):
         nodes_dict, emissions_limit = nodes_from_csv(self)
 
         logging.info(
-            "Creating a LP model for INVESTMENT AND DISPATCH OPTIMIZATION."
+            "Creating an LP model for INVESTMENT AND DISPATCH OPTIMIZATION."
         )
 
         es.add(*nodes_dict.values())
