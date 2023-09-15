@@ -168,7 +168,7 @@ def run_investment_model(config_file="./config.yml"):
     # Model run for myopic horizon optimization
     if im.myopic_horizon:
         logging.info(
-            "Creating a LP optimization model for investment optimization\n"
+            "Creating an LP optimization model for investment optimization\n"
             "using a MYOPIC HORIZON approach for model solution."
         )
 

@@ -105,7 +105,7 @@ def load_time_series_data_slice(filename=None, im=None):
         im.path_folder_input + filename,
         parse_dates=True,
         index_col=0,
-        skiprows=range(1, start_index),
+        skiprows=range(1, start_index + 1),
         nrows=end_index - start_index + 1,
     )
 
