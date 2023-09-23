@@ -5,7 +5,9 @@ Mathematical formulation
 ------------------------
 
 All constraints formulations can be found in the
-`oemof.solph documentation <https://oemof-solph.readthedocs.io/en/latest/reference/oemof.solph.html>`_.
+`oemof.solph documentation <https://oemof-solph.readthedocs.io/en/latest/reference/oemof.solph.html>`_ since ``pommesinvest`` makes use of this module.
+The prevalent breakdown of the mathematical model formulation focuses on the sets, parameters, variables, target function and
+constraints actually applied within ``pommesinvest``.
 
 Nomenclature
 ++++++++++++
@@ -21,37 +23,41 @@ Nomenclature
     | (and time increment, i.e. frequency) chosen"
     ":math:`P`", "set", "| all periods (i.e. years) within the optimization timeframe
     | chosen"
-    ":math:`PT`", "set", "| All periods and time steps, whereby the first value
+    ":math:`PT`", "set", "| all periods and time steps, whereby the first value
     | denotes the period and the second one the time step"
     ":math:`F`", "set", "| all flows of the energy system.
     | A flow is a directed connection between node A and B
     | and has a (non-negative) value (i.e. capacity flow) for every time step"
     ":math:`IF`", "set", "| all flows or nodes of the energy system that can be invested into (InvestmentFlows, GenericStorages and DSMSinks)"
+    ":math:`RES`", "set", "all renewable generators"
     ":math:`TF`", "set", "all transformers (conversion units, such as generators)"
     ":math:`B`", "set", "all buses (fictitious bus bars to connect capacity resp. energy flows)"
     ":math:`S`", "set", "all storage units"
+    ":math:`IC`", "set", "all interconnector units"
     ":math:`I(n)`", "set", "all inputs for node n"
     ":math:`O(n)`", "set", "all outputs for node n"
-    ":math:`P_{invest}(n, p)`", "variable", "Investment into new capacity for node n in period p"
+    ":math:`DR`", "set", "all demand response clusters (eligible for investment)"
+    ":math:`P_{invest}(n, p)`", "variable", "investment into new capacity for node n in period p"
     ":math:`P_{total}(n, p)`", "variable", "total installed capacity for node n in period p"
     ":math:`P_{old}(n, p)`", "variable", "old installed capacity for node n to be decommissioned at the beginning of period p"
     ":math:`P_{old,exo}(n, p)`", "variable", "| old installed capacity from exogenous investments,
     | i.e. from capacity that has initially been existing, for node n to be decommissioned at the beginning of period p"
     ":math:`P_{old,end}(n, p)`", "variable", "| old installed capacity from endogenous investments,
-    | i.e. from investements that have been chosen by the optimization model and reached their lifetime
+    | i.e. from investments that have been chosen by the optimization model and reached their lifetime
     | within the optimization time frame, for node n to be decommissioned at the beginning of period p"
     ":math:`f(i,o,p,t)`", "variable", "Flow from node i (input) to node o (output) in period p and at time step t"
     ":math:`C`", "variable", "system costs"
     ":math:`P_{i}(n, p, t)`", "variable", "inflow into transformer n in period p and at time step t"
     ":math:`P_{o}(n, p, t)`", "variable", "outflow from transformer n in period p and at time step t"
     ":math:`E(s, t)`", "variable", "energy currently stored in storage s"
-    ":math:`A(c_{invest}(n, p, l, i)`", "parameter", "| annualised investment costs for investments into node n
+    ":math:`A(c_{invest}(n, p), l(n), i(n))`", "parameter", "| annualised investment costs for investments into node or flow n
     | in period p, with lifetime l and interest rate i"
-    ":math:`i`", "parameter", "| interest rate (varied per technology)"
-    ":math:`dr`", "parameter", "| discount rate (same accross all technologies)"
+    ":math:`l(n)`", "parameter", "lifetime of investments into flow or node n (varied per technology)"
+    ":math:`i(n)`", "parameter", "interest rate for investments into node resp. flow n (varied per technology)"
+    ":math:`dr`", "parameter", "discount rate (same accross all technologies)"
     ":math:`c_{var}(i, o, t)`", "parameter", "variable costs for flow from input i to output o at time step t"
+    ":math:`cf(i, o, t)`", "parameter", "time-dependent capacity factor for renewable generator with outflow (i, o)"
     ":math:`\tau(t)`", "parameter", "time increment of the model for time step t"
-    ":math:`D_{DE}(t)`", "parameter", "total load (for Germany)"
     ":math:`\eta_{o}(n, t)`", "parameter", "conversion efficiency for outflow"
     ":math:`\eta_{i}(n, t)`", "parameter", "conversion efficiency for inflow"
     ":math:`P_{nom}(i, o)`", "parameter", "| installed capacity (all except RES outside Germany)
@@ -63,8 +69,6 @@ Nomenclature
     ":math:`E_{min}(s, t)`", "parameter", "minimum allowed storage level for storage s"
     ":math:`E_{max}(s, t)`", "parameter", "maximum allowed storage level for storage s"
     ":math:`\beta(s, t)`", "parameter", "fraction of lost energy as share of :math:`E(s, t)`"
-    ":math:`\gamma(s, t)`", "parameter", "fixed loss of energy relative to :math:`E_{nom}(s)` per time unit"
-    ":math:`\delta(s, t)`", "parameter", "absolute fixed loss of energy per time unit"
     ":math:`\dot{E}_i(s, p, t)`", "parameter", "energy flowing into storage s in period p and at time step t"
     ":math:`\dot{E}_o(s, p, t)`", "parameter", "energy extracted from storage s in period p and at time step t"
     ":math:`\eta_i(s, t)`", "parameter", "conversion factor (i.e. efficiency) of storage s for storing energy"
@@ -73,6 +77,7 @@ Nomenclature
     ":math:`t_u`", "parameter", "time unit of losses :math:`\beta(t)`, :math:`\gamma(t)`, :math:`\delta(t)` and time increment :math:`\tau(t)`"
     ":math:`ef(i, o)`", "parameter", "emission factor in :math:`\frac {t \space CO_2}{MWh}`"
     ":math:`EL`", "parameter", "overall emission limit in :math:`t \space CO_2`"
+    ":math:`EL(p)`", "parameter", "annual overall emission limit in :math:`t \space CO_2`"
 
 
 Target function
@@ -84,23 +89,21 @@ oemof.solph components used (`see the oemof.solph.models module <https://github.
 System costs: Sum of
 
     * annualised investment costs for flows that can be invested into,
-    * fixed costs for flows associated with a fixed costs value as well as
+    * fixed costs for flows associated with a fixed costs value (only flows eligible for investment) as well as
     * variable costs for all flows (commodity / fuel, emissions and operation costs):
 
 .. math::
 
-    & Min \space C = (\sum_{n} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l, i) \cdot l \\
-    & + (\sum_{pp=p}^{p+l} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \\
-    & + \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot c_{var}(i, o, t)) \cdot DF^{-p} \\
-    & \forall \space n \in \mathrm{IF}, \space (i, o) \in \mathrm{F},
-    \space p \in \textrm{P}, \space t \in \mathrm{T}
+    & Min \space C = \sum_{n \in \mathrm{IF}} (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \\
+    & + \sum_{pp=p}^{p+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \\
+    & + \sum_{(i,o) \in \mathrm{F}} \sum_{p \in \mathrm {P}} \sum_{t \in \mathrm {T}} f(i, o, p, t) \cdot c_{var}(i, o, t)) \cdot DF^{-p} \\
 
 whereby
 
 .. math::
 
-    & A(c_{invest}(n, p), l, i) = c_{invest}(n, p) \cdot
-    \frac {(1+i)^l \cdot i} {(1+i)^l - 1} \\
+    & A(c_{invest}(n, p), l(n), i(n)) = c_{invest}(n, p) \cdot
+    \frac {(1+i(n))^{l(n)} \cdot i(n)} {(1+i(n))^{l(n)} - 1} \\
     & \\
     & DF=(1+dr)
 
@@ -110,11 +113,14 @@ Constraints of the core model
 The following constraints apply to a model in its basic formulation (i.e.
 not including demand response and emissions limits):
 
+Investment variables interrelation
+==================================
+
 * Investment bounds:
 
 .. math::
     & P_{invest, min}(n, p) <= P_{invest}(n, p) <= P_{invest,max}(n, p) \\
-    & \forall \space n \in \mathrm{IF}, \space p \in \textrm{P}
+    & \forall \space n \in \mathrm{IF}, \space p \in \mathrm{P}
 
 
 * Total capacity (resp. total energy in case of storage energy content):
@@ -123,30 +129,30 @@ not including demand response and emissions limits):
     &
         P_{total}(n, p) = \left\{\begin{array}{11} P_{invest}(n, p) + P_{exist}(n, p), & p=0 \\
         P_{total}(n, p-1) + P_{invest}(n, p) - P_{old}(n, p), & p\not=0\end{array}\right. \\
-    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS}
+    & \forall \space n \in \mathrm{IF}, p \in \mathrm{P}
 
 * Old capacity to be decommissioned in period p
 
 .. math::
     &
     P_{old}(n, p) = P_{old,exo}(n, p) + P_{old,end}(n, p) \\
-    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS} \\
+    & \forall \space n \in \mathrm{IF}, p \in \mathrm{P} \\
     &\\
     &
     P_{old,end}(n, p) =
         \begin{cases} 0, & p=0 \\
         P_{invest}(n, p_{comm}), & l \leq year(p) \\
         P_{old,end}(p), & else \\
-        \end{cases}
-    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS} \\
+        \end{cases} \\
+    & \forall \space n \in \mathrm{IF}, p \in \mathrm{P} \\
     &\\
     &
     P_{old,exo}(n, p) =
         \begin{cases} 0, & p=0 \\
         P_{exist}(n) (*), & l - a \leq year(p) \\
         0, & else \\
-        \end{cases}
-    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS} \\
+        \end{cases} \\
+    & \forall \space n \in \mathrm{IF}, p \in \mathrm{P} \\
 
 whereby:
 
@@ -161,13 +167,16 @@ whereby:
   or exceeded that is than selected as decommissioning period for this particular
   investment.
 
+
 * Overall maximum of total installed capacity (resp. energy)
 
 .. math::
     &
     P_{total}(n, p) \leq P_{overall,max} \\
-    & \forall \space n \in \mathrm{IF}, \space p \in \textrm{PERIODS}
+    & \forall \space n \in \mathrm{IF}, \space p \in \mathrm{P}
 
+Power balance
+=============
 
 * Flow balance(s):
 
@@ -184,6 +193,43 @@ with :math:`\tau(t)` equalling to the time increment (defaults to 1 hour)
     This is equal to an overall energy balance requirement, but build up
     decentrally from a balancing requirement of every bus, thus allowing for
     a flexible expansion of the system size.
+
+Power Transmission
+==================
+
+There are two kinds of power transmission options between market areas:
+AC transmission with a time-dependent maximum capacity and DC transmission with a fixed maximum capacity
+
+* Maximum exchange between market areas:
+
+.. math::
+
+    & f(i, o, p, t) \leq f_{max}(i, o, t) * P_{nom}(i, o) \\
+    & \space \forall (i, o), \space (i, o) \in \mathrm{IC}, \space (p, t) \in \mathrm{PT}
+
+whereby :math:`f(i, o, p, t)` denotes the flow via an interconnector that connects
+the exporting market area on the input side with the importing market area on the output
+side.
+
+Renewable Generators
+====================
+
+The installed capacity as well as the output of renewable energies is fixed. The
+model may decide on curtailing excessive amounts by activating
+a sink to collect the excess generation, though.
+
+* Renewables output:
+
+.. math::
+
+    & f(i, o, p, t) = cf(i, o, t) * P_{nom}(i, o) \\
+    & \forall \space (i, o) \in \mathrm{RES}, \space (p, t) \in \mathrm{PT}
+
+The capacity factor :math:`cf(i, o, t)` is scaled accordingly to account for
+the renewable expansion.
+
+Backup Generators
+=================
 
 * Energy transformation:
 
@@ -202,7 +248,7 @@ for losses from the conversion (within the power plant).
 unit. We use this for conventional or carbon-neutral controllable backup generators
 as well as interconnection line losses.
 
-* Minimum and maximum load requirements (for generators)
+* Minimum and maximum load requirements
 
 .. math::
 
@@ -227,7 +273,7 @@ which leads to:
     & \forall \space (i, o) \in \mathrm{IF},
     \space t \in \mathrm{T} \\
     & \\
-    & f(i, o, t) \leq f_{max}(i, o, t) \cdot P_{total}(i, o) \\
+    & f(i, o, p, t) \leq f_{max}(i, o, t) \cdot P_{total}(i, o) \\
     & \forall \space (i, o) \in \mathrm{IF},
     \space (p, t) \in \mathrm{PT}
 
@@ -239,13 +285,14 @@ which leads to:
     applies, or for exogenous installations or decommissionings, where
     the maximum is increased or decreased on an annual basis.
 
-* Storages
+Storages
+========
 
-    * Storage roundtrip (existing units):
+* Storage roundtrip (existing units):
 
-    .. math::
+.. math::
 
-        E(s, |\mathrm{T}|) = E(s, -1)
+    E(s, |\mathrm{T}|) = E(s, -1)
 
 with the last storage level :math:`E(s, |\mathrm{T}|)` equalling the
 initial storage content :math:`E(s, -1)`.
@@ -258,14 +305,14 @@ initial storage content :math:`E(s, -1)`.
     until the last time point of the simulation, no additional roundtrip balancing
     constraint is introduced.
 
-    * Storage balance:
+* Storage balance:
 
-    .. math::
+.. math::
 
-        & E(s, t + 1) = E(s, t) \cdot (1 - \beta(s, t)) ^{\tau(t)/(t_u)} \\
-        & - \frac{\dot{E}_o(s, p, t)}{\eta_o(s, t)} \cdot \tau(t)
-        + \dot{E}_i(s, p, t) \cdot \eta_i(s, t) \cdot \tau(t) \\
-        & \forall \space s \in \mathrm{S}, \space (p, t) \in \mathrm{PT}
+    & E(s, t + 1) = E(s, t) \cdot (1 - \beta(s, t)) ^{\tau(t)/(t_u)} \\
+    & - \frac{\dot{E}_o(s, p, t)}{\eta_o(s, t)} \cdot \tau(t)
+    + \dot{E}_i(s, p, t) \cdot \eta_i(s, t) \cdot \tau(t) \\
+    & \forall \space s \in \mathrm{S}, \space (p, t) \in \mathrm{PT}
 
 with :math:`E_{nom}(s)` as the nominal storage capacity,
 :math:`\beta(t)` as the relative loss of stored energy and
@@ -301,14 +348,21 @@ The latter is used as a default.
 
 .. math::
 
-    & \sum_{(i,o)} \sum_t f(i, o, t) \cdot \tau(t) \cdot ef(i, o) \leq EL \\
+    & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot ef(i, o) \leq EL \\
     & \space (i, o) \in \mathrm{F}
 
 with :math:`ef(i, o)` as the specific emission factor and :math:`EL` as the
-overall emission cap for the simulation time frame (usually one year).
+overall emission budget (cap) for the overall optimization time frame.
 
-Demand response constraints
-===========================
+* Annual emissions limit:
+
+.. math::
+
+    & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot ef(i, o) \leq EL(p) \\
+    & \space (i, o) \in \mathrm{F}, \space \forall p \in \mathrm{P}
+
+Demand Response
+===============
 
 Since demand response is one of the key interest points of *POMMES*, there
 are three different implementations which can be chosen from:
@@ -321,19 +375,29 @@ are three different implementations which can be chosen from:
     An evaluation of different modeling approaches has been carried out and
     presented at the INREC 2020 (Kochems 2020). Some of the results are as follows:
 
-    * DLR: An extensive modeling approach for demand response which neither
+    * *DLR*: An extensive modeling approach for demand response which neither
       leads to an over- nor underestimization of potentials and balances
       modeling detail and computation intensity.
-    * DIW: A solid implementation with the tendency of slight overestimization
+    * *DIW*: A solid implementation with the tendency of slight overestimization
       of potentials since a `shift_time` is not included. It may get
       computationally expensive due to a high time-interlinkage in constraint
       formulations.
-    * oemof: A very computationally efficient approach which only requires the
+    * *oemof*: A very computationally efficient approach which only requires the
       energy balance to be levelled out in certain intervals. If demand
       response is not at the center of the research and/or parameter
       availability is limited, this approach should be chosen.
       Note that approach `oemof` does allow for load shedding,
       but does not impose a limit on maximum amount of shedded energy.
+
+.. note::
+
+    Since the contraints around the definition of the relationship between the
+    investment-related parameters :math:`P_{total}(n, p)`, :math:`P_{invest}(n, p)`
+    and :math:`P_{old}(n, p)` with n denoting the node (e.g. the demand response cluster)
+    and p denoting the respective period are basically identical to those for other
+    investments (InvestmentFlows, GenericStorages), these are not explicitly stated
+    here, but of course are incorporated in the model. Instead, only the differences
+    is focussed upon in the following section.
 
 For the sake of readability, the variables and parameters used for demand
 response modeling are listed separately in the following table:
@@ -412,10 +476,11 @@ are given separately for each approach:
 
     | The constraints and objective terms hold for all demand response units which are
     | aggregated to demand response clusters (with homogeneous costs and delay resp. shifting times).
-    | For the sake of readability, the technology index is not displayed.
+    | For the sake of readability, the technology index is not displayed except for the target function term
+    | which sums across the different demand response clusters.
     | Furthermore, for some constraints there may be index violations which are taken care of by
     | limiting to the feasible time indices :math:`{0, 1, .., |T|}`. This is also not displayed for the sake of readability.
-    | For the complete implementation and details, please refer to `the sink_dsm module of oemof.solph <https://github.com/oemof/oemof-solph/blob/master/src/oemof/solph/custom/sink_dsm.py>`_.
+    | For the complete implementation and details, please refer to `the sink_dsm module of oemof.solph <https://github.com/oemof/oemof-solph/blob/master/src/oemof/solph/experimental/_sink_dsm.py>`_.
 
 **approach `oemof`**:
 
@@ -433,34 +498,37 @@ are given separately for each approach:
     \quad \textrm{if} \quad e_{shed} = \textrm{False} \\
     & \\
     &
-    (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max} + DSM_{t}^{up}
+    (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max}(p)
+    + DSM_{t}^{up}
     - DSM_{t}^{do, shift} - DSM_{t}^{do, shed} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathbb{PT} \\
     & \\
     &
-    (4) \quad  DSM_{t}^{up} \leq E_{t}^{up} \cdot E_{up, max} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    (4) \quad  DSM_{t}^{up} \leq E_{t}^{up} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathbb{PT} \\
     & \\
     &
-    (5) \quad DSM_{t}^{do, shift} + DSM_{t}^{do, shed}
-    \leq  E_{t}^{do} \cdot E_{do, max} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    (5) \quad DSM_{t}^{do, shift} +  DSM_{t}^{do, shed} \leq
+    E_{t}^{do} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathbb{PT} \\
     & \\
     &
     (6) \quad  \sum_{t=t_s}^{t_s+\tau} DSM_{t}^{up} \cdot \eta =
     \sum_{t=t_s}^{t_s+\tau} DSM_{t}^{do, shift} \\
-    & \quad \quad \quad \quad \forall t_s \in \{k \in \mathbb{T}
-    \mid k \mod \tau = 0\} \\
+    & \quad \quad \quad \quad \forall t_s \in
+    \{k \in \mathbb{T} \mid k \mod \tau = 0\} \\
 
-* Objective function term:
+* Objective function term (added to objective function above):
 
 .. math::
     &
-    (DSM_{t}^{up} \cdot cost_{t}^{dsm, up}
-    + DSM_{t}^{do, shift} \cdot cost_{t}^{dsm, do, shift}
-    + DSM_{t}^{do, shed} \cdot cost_{t}^{dsm, do, shed})
-    \cdot \omega_{t} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    \sum_{n \in \mathrm{DR}} (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
+    &
+    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p} \\
+    &
+    + \sum_{p \in \mathrm{P}} \sum_{t \in \mathrm{T}} (DSM_{n, t}^{up} \cdot cost_{n, t}^{dsm, up} + DSM_{n, t}^{do, shift} \cdot cost_{n, t}^{dsm, do, shift} \\
+    &
+    + DSM_{n, t}^{do, shed} \cdot cost_{n, t}^{dsm, do, shed}) \cdot \omega_{t} \cdot DF^{-p} \\
 
 **approach `DIW`**:
 
@@ -660,6 +728,11 @@ are given separately for each approach:
     & + DSM_{t}^{do, shed} \cdot cost_{t}^{dsm, do, shed})
     \cdot \omega_{t} \\
     & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+
+Electric Vehicles
+=================
+
+TODO: Add description!
 
 References
 ++++++++++
