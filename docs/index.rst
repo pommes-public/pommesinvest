@@ -7,13 +7,13 @@
    :alt: PyPI - Python Version
 
 .. image:: https://readthedocs.org/projects/pommesinvest/badge/?version=latest
-   :target: https://vencopy.readthedocs.io/en/latest/?badge=latest
+   :target: https://pommesinvest.readthedocs.io/en/latest/?badge=latest
    :alt: Documentation Status
 
 .. image:: https://img.shields.io/pypi/l/pommesinvest
    :alt: PyPI - License
 
-------------------------------
+-------------------------------------------
 
 Welcome to pommesinvest's documentation!
 ===========================================
