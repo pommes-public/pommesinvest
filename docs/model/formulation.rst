@@ -26,7 +26,7 @@ Nomenclature
     ":math:`F`", "set", "| all flows of the energy system.
     | A flow is a directed connection between node A and B
     | and has a (non-negative) value (i.e. capacity flow) for every time step"
-    ":math:`IF`", "set", "| all flows or nodes of the energy system that can be invested into"
+    ":math:`IF`", "set", "| all flows or nodes of the energy system that can be invested into (InvestmentFlows, GenericStorages and DSMSinks)"
     ":math:`TF`", "set", "all transformers (conversion units, such as generators)"
     ":math:`B`", "set", "all buses (fictitious bus bars to connect capacity resp. energy flows)"
     ":math:`S`", "set", "all storage units"
@@ -110,13 +110,72 @@ Constraints of the core model
 The following constraints apply to a model in its basic formulation (i.e.
 not including demand response and emissions limits):
 
-* flow balance(s):
+* Investment bounds:
+
+.. math::
+    & P_{invest, min}(n, p) <= P_{invest}(n, p) <= P_{invest,max}(n, p) \\
+    & \forall \space n \in \mathrm{IF}, \space p \in \textrm{P}
+
+
+* Total capacity (resp. total energy in case of storage energy content):
+
+.. math::
+    &
+        P_{total}(n, p) = \left\{\begin{array}{11} P_{invest}(n, p) + P_{exist}(n, p), & p=0 \\
+        P_{total}(n, p-1) + P_{invest}(n, p) - P_{old}(n, p), & p\not=0\end{array}\right. \\
+    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS}
+
+* Old capacity to be decommissioned in period p
+
+.. math::
+    &
+    P_{old}(n, p) = P_{old,exo}(n, p) + P_{old,end}(n, p) \\
+    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS} \\
+    &\\
+    &
+    P_{old,end}(n, p) =
+        \begin{cases} 0, & p=0 \\
+        P_{invest}(n, p_{comm}), & l \leq year(p) \\
+        P_{old,end}(p), & else \\
+        \end{cases}
+    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS} \\
+    &\\
+    &
+    P_{old,exo}(n, p) =
+        \begin{cases} 0, & p=0 \\
+        P_{exist}(n) (*), & l - a \leq year(p) \\
+        0, & else \\
+        \end{cases}
+    & \forall \space n \in \mathrm{IF}, p \in \textrm{PERIODS} \\
+
+whereby:
+
+* (*) is only performed for the first period the condition
+  is True. A decommissioning flag is then set to True
+  to prevent having falsely added old capacity in future periods.
+* :math:`year(p)` is the year corresponding to period p
+* :math:`p_{comm}` is the commissioning period of the flow
+  (which is determined by the model itself). For determining the commissioning
+  period, a matrix is used that keeps track of unit age per period. This is used
+  to check for the first period, in which the lifetime of an investment is reached
+  or exceeded that is than selected as decommissioning period for this particular
+  investment.
+
+* Overall maximum of total installed capacity (resp. energy)
+
+.. math::
+    &
+    P_{total}(n, p) \leq P_{overall,max} \\
+    & \forall \space n \in \mathrm{IF}, \space p \in \textrm{PERIODS}
+
+
+* Flow balance(s):
 
 .. math::
 
-    & \sum_{i \in I(n)} f(i, n, t) \cdot \tau(t)
-    = \sum_{o \in O(n)} f(n, o, t) \cdot \tau(t) \\
-    & \forall \space n \in \mathrm{B}, \space t \in \mathrm{T}
+    & \sum_{i \in I(n)} f(i, n, p, t) \cdot \tau(t)
+    = \sum_{o \in O(n)} f(n, o, p, t) \cdot \tau(t) \\
+    & \forall \space n \in \mathrm{B}, \space (p, t) \in \mathrm{PT}
 
 with :math:`\tau(t)` equalling to the time increment (defaults to 1 hour)
 
@@ -126,77 +185,63 @@ with :math:`\tau(t)` equalling to the time increment (defaults to 1 hour)
     decentrally from a balancing requirement of every bus, thus allowing for
     a flexible expansion of the system size.
 
-The power price for Germany is derived from the dual values (shadow prices)
-of the flow balance for the German electricity price:
+* Energy transformation:
 
 .. math::
-
-    p_{DE}(t) = \frac {\partial C}{\partial D_{DE}(t)}
-
-* energy transformation:
-
-.. math::
-    & P_{i}(n, t) \times \eta_{o}(n, t) =
-    P_{o}(n, t) \times \eta_{i}(n, t), \\
-    & \forall \space t \in \mathrm{T}, \space n \in \mathrm{TF},
+    & P_{i}(n, p, t) \cdot \eta_{o}(n, t) =
+    P_{o}(n, p, t) \cdot \eta_{i}(n, t), \\
+    & \forall \space (p, t) \in \mathrm{PT}, \space n \in \mathrm{TF},
     \space i \in \mathrm{I(n)}, \space o \in \mathrm{O(n)}
 
-with :math:`P_{i}(n, t)` as the inflow into the transformer node n,
-:math:`P_{o}(n, t)` as the transformer outflow, :math:`\eta_{o}(n, t)` the
+with :math:`P_{i}(n, p, t)` as the inflow into the transformer node n,
+:math:`P_{o}(n, p, t)` as the transformer outflow, :math:`\eta_{o}(n, t)` the
 conversion efficiency for outputs and :math:`\eta_{i}(n, t)` the conversion
 factors for inflows. We only use the conversion factor for outflows to account
 for losses from the conversion (within the power plant).
 :math:`\mathrm{TF}` is the set of transformers, i.e. any kind of energy conversion
-unit. We use this for conventional generators, renewable energy sources (RES)
-within the market premium scheme in Germany (with 100% efficiency -
-used just to steer the price-based output in times, RES are price setting)
+unit. We use this for conventional or carbon-neutral controllable backup generators
 as well as interconnection line losses.
 
-* gradient limits for generators
+* Minimum and maximum load requirements (for generators)
 
 .. math::
 
-    & f(i, o, t) - f(i, o, t-1) \leq \Delta P_{pos}(i, o, t) \\
-    & \forall \space (i, o) \in \mathrm{PGF},
-    \space t \in \mathrm{T} \\
-    & \\
-    & f(i, o, t-1) - f(i, o, t) \leq \Delta P_{neg}(i, o, t) \\
-    & \forall \space (i, o) \in \mathrm{NGF},
-    \space t \in \mathrm{T}
-
-with :math:`\Delta P_{pos}(i, o, t)` equalling to the maximum allowed positive
-an :math:`\Delta P_{neg}(i, o, t)` equalling to the maximum allowed negative
-gradient and :math:`\mathrm{PGF}` resp. :math:`\mathrm{NGF}` being the set
-of flows with positive or negative gradient limits (i.e. conventional
-generators).
-
-* minimum and maximum load requirements
-
-.. math::
-
-    & f(i, o, t) \geq f_{min}(i, o, t) \cdot P_{nom}(i, o) \\
-    & \forall \space (i, o) \in \mathrm{F},
+    & f(i, o, p, t) \geq f_{min}(i, o, t) \cdot P_{nom}(i, o) \\
+    & \forall \space (i, o) \in \mathrm{F} \setminus \mathrm{IF},
     \space t \in \mathrm{T} \\
     & \\
     & f(i, o, t) \leq f_{max}(i, o, t) \cdot P_{nom}(i, o) \\
-    & \forall \space (i, o) \in \mathrm{F},
-    \space t \in \mathrm{T}
+    & \forall \space (i, o) \in \mathrm{F} \setminus \mathrm{IF},
+    \space (p, t) \in \mathrm{PT}
 
 with :math:`P_{nom}(i, o)` equalling to the installed resp. maximum capacity,
 :math:`f_{min}(i, o, t)` as the normalized minimum flow value
 and :math:`f_{max}(i, o, t)` as the normalized maximum flow value.
 
+For investment flows, :math:`P_{nom}(i, o)` is replaced by the total capacity,
+which leads to:
+
+.. math::
+
+    & f(i, o, p, t) \geq f_{min}(i, o, t) \cdot P_{total}(i, o) \\
+    & \forall \space (i, o) \in \mathrm{IF},
+    \space t \in \mathrm{T} \\
+    & \\
+    & f(i, o, t) \leq f_{max}(i, o, t) \cdot P_{total}(i, o) \\
+    & \forall \space (i, o) \in \mathrm{IF},
+    \space (p, t) \in \mathrm{PT}
+
 .. note::
 
-    Whereas the maximum value is fixed and set to 1 for all units and time steps,
-    the minimum value of some generator types may alter over time.
-    This is especially true for combined heat and power (CHP) plants
+    Both, the maximum and the minimum output may vary over time.
+    This is e.g. used for modelling combined heat and power (CHP) plants
     and industrial power plants (IPP), where a minimum load pattern
-    is fed in, in order to serve the heating or process steam demand.
+    applies, or for exogenous installations or decommissionings, where
+    the maximum is increased or decreased on an annual basis.
 
-* storages
+* Storages
 
-    * Storage roundtrip:
+    * Storage roundtrip (existing units):
 
     .. math::
 
@@ -205,22 +250,25 @@ and :math:`f_{max}(i, o, t)` as the normalized maximum flow value.
 with the last storage level :math:`E(s, |\mathrm{T}|)` equalling the
 initial storage content :math:`E(s, -1)`.
 
+.. note::
+
+    The storage roundtrip condition is only applied to existing storage units.
+    Storages that are invested into by the model, initially have a storage content of
+    0. Since it would be costly for the model, not to withdraw all energy from the storage
+    until the last time point of the simulation, no additional roundtrip balancing
+    constraint is introduced.
+
     * Storage balance:
 
     .. math::
 
-        & E(s, t) = E(s, t-1) \cdot (1 - \beta(s, t)) ^{\tau(t)/(t_u)} \\
-        & - \gamma(s, t)\cdot E_{nom}(s) \cdot {\tau(t)/(t_u)}
-        - \delta(t) \cdot {\tau(t)/(t_u)} \\
-        & - \frac{\dot{E}_o(s, t)}{\eta_o(s, t)} \cdot \tau(t)
-        + \dot{E}_i(s, t) \cdot \eta_i(s, t) \cdot \tau(t) \\
-        & \forall \space s \in \mathrm{S}, \space t \in \mathrm{T}
+        & E(s, t + 1) = E(s, t) \cdot (1 - \beta(s, t)) ^{\tau(t)/(t_u)} \\
+        & - \frac{\dot{E}_o(s, p, t)}{\eta_o(s, t)} \cdot \tau(t)
+        + \dot{E}_i(s, p, t) \cdot \eta_i(s, t) \cdot \tau(t) \\
+        & \forall \space s \in \mathrm{S}, \space (p, t) \in \mathrm{PT}
 
 with :math:`E_{nom}(s)` as the nominal storage capacity,
-:math:`\beta(t)` as the relative loss of stored energy,
-:math:`\gamma(t)` as the fixed loss of stored energy relative to the
-nominal storage capacity,
-:math:`\delta(t)` as the fixed losses in absolute terms and
+:math:`\beta(t)` as the relative loss of stored energy and
 :math:`t_u` the time unit to create dimensionless factors resp. exponents.
 
     * Storage level limits:
@@ -243,7 +291,13 @@ are set accordingly, see :ref:`config`.
 Emissions limit
 ===============
 
-Limit the overall annual emissions (resp. emissions for the timeframe considered):
+``pommesinvest`` allows to select between two optional investment limits:
+* an overall emissions budget limit for the entire optimization timeframe that
+the model is free to distribute over time and
+* an annual emissions limit that is defined on a periodical, i.e. annual basis.
+The latter is used as a default.
+
+* Overall emissions budget:
 
 .. math::
 
