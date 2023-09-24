@@ -36,7 +36,7 @@ def years_between(y1, y2):
     """Calculate the difference in years between two dates using
     the dateutil.relativedelta package
 
-    Parameters:
+    Parameters
     ----------
     y1: :obj:`str`
         The first date string
@@ -93,13 +93,13 @@ def time_steps_between_timestamps(ts1, ts2, freq):
 def is_leap_year(year):
     """Check whether given year is a leap year or not
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     year: :obj:`int`
         year which shall be checked
 
-    Returns:
-    --------
+    Returns
+    -------
     leap_year: :obj:`boolean`
         True if year is a leap year and False else
     """
@@ -118,13 +118,13 @@ def is_leap_year(year):
 def multiple_leap_years(years):
     """Check a list of multiple years to find out which are leap years
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     years: :obj:`list`
         list of years which shall be checked
 
-    Returns:
-    --------
+    Returns
+    -------
     list of leap years
     """
     leap_years_boolean = [is_leap_year(el) for el in years]
