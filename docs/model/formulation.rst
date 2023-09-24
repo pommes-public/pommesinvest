@@ -6,7 +6,7 @@ Mathematical formulation
 
 All constraints formulations can be found in the
 `oemof.solph documentation <https://oemof-solph.readthedocs.io/en/latest/reference/oemof.solph.html>`_ since ``pommesinvest`` makes use of this module.
-The prevalent breakdown of the mathematical model formulation focuses on the sets, parameters, variables, target function and
+The breakdown of the mathematical model formulation at hand focuses on the sets, parameters, variables, target function and
 constraints actually applied within ``pommesinvest``.
 
 Nomenclature
@@ -18,19 +18,20 @@ Nomenclature
 
     ":math:`N`", "set", "| all components of the energy system.
     | This comprises Sources, Sinks, Buses, Transformers,
-    | Generic Storages and optionally DSMSinks"
-    ":math:`T`", "set", "| all time steps within the optimization timeframe
+    | GenericStorages and optionally DSMSinks"
+    ":math:`T`", "set", "| all time steps within the optimization time frame
     | (and time increment, i.e. frequency) chosen"
-    ":math:`P`", "set", "| all periods (i.e. years) within the optimization timeframe
+    ":math:`P`", "set", "| all periods (i.e. years) within the optimization time frame
     | chosen"
     ":math:`PT`", "set", "| all periods and time steps, whereby the first value
     | denotes the period and the second one the time step"
     ":math:`F`", "set", "| all flows of the energy system.
     | A flow is a directed connection between node A and B
     | and has a (non-negative) value (i.e. capacity flow) for every time step"
-    ":math:`IF`", "set", "| all flows or nodes of the energy system that can be invested into (InvestmentFlows, GenericStorages and DSMSinks)"
+    ":math:`IF`", "set", "| all flows or nodes of the energy system that can be invested into.
+    | Comprises InvestmentFlows, GenericStorages and DSMSinks"
     ":math:`RES`", "set", "all renewable generators"
-    ":math:`TF`", "set", "all transformers (conversion units, such as generators)"
+    ":math:`TF`", "set", "all transformers (i.e. conversion units, such as generators)"
     ":math:`B`", "set", "all buses (fictitious bus bars to connect capacity resp. energy flows)"
     ":math:`S`", "set", "all storage units"
     ":math:`IC`", "set", "all interconnector units"
@@ -39,43 +40,57 @@ Nomenclature
     ":math:`DR`", "set", "all demand response clusters (eligible for investment)"
     ":math:`P_{invest}(n, p)`", "variable", "investment into new capacity for node n in period p"
     ":math:`P_{total}(n, p)`", "variable", "total installed capacity for node n in period p"
-    ":math:`P_{old}(n, p)`", "variable", "old installed capacity for node n to be decommissioned at the beginning of period p"
+    ":math:`P_{old}(n, p)`", "variable", "| old installed capacity for node n
+    | to be decommissioned at the beginning of period p"
     ":math:`P_{old,exo}(n, p)`", "variable", "| old installed capacity from exogenous investments,
-    | i.e. from capacity that has initially been existing, for node n to be decommissioned at the beginning of period p"
+    | i.e. from capacity that has initially been existing,
+    | for node n to be decommissioned at the beginning of period p"
     ":math:`P_{old,end}(n, p)`", "variable", "| old installed capacity from endogenous investments,
-    | i.e. from investments that have been chosen by the optimization model and reached their lifetime
-    | within the optimization time frame, for node n to be decommissioned at the beginning of period p"
-    ":math:`f(i,o,p,t)`", "variable", "Flow from node i (input) to node o (output) in period p and at time step t"
+    | i.e. from investments that have been chosen by the optimization model
+    | and reached their lifetime within the optimization time frame,
+    | for node n to be decommissioned at the beginning of period p"
+    ":math:`f(i,o,p,t)`", "variable", "| Flow from node i (input) to node o (output)
+    | in period p and at time step t"
     ":math:`C`", "variable", "system costs"
     ":math:`P_{i}(n, p, t)`", "variable", "inflow into transformer n in period p and at time step t"
     ":math:`P_{o}(n, p, t)`", "variable", "outflow from transformer n in period p and at time step t"
     ":math:`E(s, t)`", "variable", "energy currently stored in storage s"
     ":math:`A(c_{invest}(n, p), l(n), i(n))`", "parameter", "| annualised investment costs for investments into node or flow n
     | in period p, with lifetime l and interest rate i"
-    ":math:`l(n)`", "parameter", "lifetime of investments into flow or node n (varied per technology)"
-    ":math:`i(n)`", "parameter", "interest rate for investments into node resp. flow n (varied per technology)"
-    ":math:`dr`", "parameter", "discount rate (same accross all technologies)"
+    ":math:`l(n)`", "parameter", "| lifetime of investments into flow or node n
+    | (varied per technology)"
+    ":math:`a(n)`", "parameter", "initial age of existing capacity of flow or node n"
+    ":math:`i(n)`", "parameter", "| interest rate for investments into node resp. flow n
+    | (varied per technology)"
+    ":math:`dr`", "parameter", "discount rate (same across all technologies)"
+    ":math:`D_{max}(o)`", "parameter", "maximum demand for market area o"
+    ":math:`year(p)`", "parameter", "number of 'real-life' calendric year corresponding to the start of period p"
     ":math:`c_{var}(i, o, t)`", "parameter", "variable costs for flow from input i to output o at time step t"
-    ":math:`cf(i, o, t)`", "parameter", "time-dependent capacity factor for renewable generator with outflow (i, o)"
+    ":math:`cf(i, t)`", "parameter", "| time-dependent capacity factor for renewable generator i"
+    ":math:`d(o, t)`", "parameter", "normalized demand for time step t of node o"
     ":math:`\tau(t)`", "parameter", "time increment of the model for time step t"
-    ":math:`\eta_{o}(n, t)`", "parameter", "conversion efficiency for outflow"
-    ":math:`\eta_{i}(n, t)`", "parameter", "conversion efficiency for inflow"
+    ":math:`\eta_{o}(n, t)`", "parameter", "conversion efficiency for outflow from node n at time step t"
+    ":math:`\eta_{i}(n, t)`", "parameter", "conversion efficiency for inflow into node n at time step t"
     ":math:`P_{nom}(i, o)`", "parameter", "| installed capacity (all except RES outside Germany)
-    | or maximum achievable output value (RES outside Germany) for exogenously defined capacities"
-    ":math:`f_{min}(i, o, p, t)`", "parameter", "normalized minimum output for flow from input i to output o"
-    ":math:`f_{max}(i, o, p, t)`", "parameter", "normalized maximum output for flow from input i to output o"
+    | or maximum achievable output value (RES outside Germany)
+    | for exogenously defined capacities"
+    ":math:`P_{overall,max}(n)`", "parameter", "| overall maximum allowed installations for node or flow n
+    | (varied per technology)"
+    ":math:`f_{min}(i, o, t)`", "parameter", "normalized minimum output for flow from input i to output o"
+    ":math:`f_{max}(i, o, t)`", "parameter", "normalized maximum output for flow from input i to output o"
     ":math:`E_{nom}(s)`", "parameter", "| nominal capacity of storage s (maximum achievable capacity
     | based on historic utilization, not the installed one)"
+    ":math:`E(s,-1)`", "parameter", "initial storage content for storage s"
     ":math:`E_{min}(s, t)`", "parameter", "minimum allowed storage level for storage s"
     ":math:`E_{max}(s, t)`", "parameter", "maximum allowed storage level for storage s"
     ":math:`\beta(s, t)`", "parameter", "fraction of lost energy as share of :math:`E(s, t)`"
     ":math:`\dot{E}_i(s, p, t)`", "parameter", "energy flowing into storage s in period p and at time step t"
     ":math:`\dot{E}_o(s, p, t)`", "parameter", "energy extracted from storage s in period p and at time step t"
     ":math:`\eta_i(s, t)`", "parameter", "conversion factor (i.e. efficiency) of storage s for storing energy"
-    ":math:`\eta_o(s, t)`", "parameter", "| conversion factor (i.e. efficiency) of storage s for withdrawing
-    | stored energy"
-    ":math:`t_u`", "parameter", "time unit of losses :math:`\beta(t)`, :math:`\gamma(t)`, :math:`\delta(t)` and time increment :math:`\tau(t)`"
-    ":math:`ef(i, o)`", "parameter", "emission factor in :math:`\frac {t \space CO_2}{MWh}`"
+    ":math:`\eta_o(s, t)`", "parameter", "| conversion factor (i.e. efficiency) of storage s
+    | for withdrawing stored energy"
+    ":math:`t_u`", "parameter", "time unit of losses :math:`\beta(t)` and time increment :math:`\tau(t)`"
+    ":math:`e(i, o)`", "parameter", "emission factor in :math:`t \space \frac {CO_2}{MWh}`"
     ":math:`EL`", "parameter", "overall emission limit in :math:`t \space CO_2`"
     ":math:`EL(p)`", "parameter", "annual overall emission limit in :math:`t \space CO_2`"
 
@@ -86,15 +101,15 @@ The target function is build together by the ``_objective_expression`` terms of 
 oemof.solph components used (`see the oemof.solph.models module <https://github.com/oemof/oemof-solph/blob/dev/src/oemof/solph/models.py>`_):
 
 
-System costs: Sum of
+**System costs**: Sum of
 
     * annualised investment costs for flows that can be invested into,
     * fixed costs for flows associated with a fixed costs value (only flows eligible for investment) as well as
-    * variable costs for all flows (commodity / fuel, emissions and operation costs):
+    * variable costs for all flows (commodity resp. fuel, emissions and operation costs):
 
 .. math::
 
-    & Min \space C = \sum_{n \in \mathrm{IF}} (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \\
+    Min \space C = & \sum_{n \in \mathrm{IF}} ((\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \\
     & + \sum_{pp=p}^{p+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \\
     & + \sum_{(i,o) \in \mathrm{F}} \sum_{p \in \mathrm {P}} \sum_{t \in \mathrm {T}} f(i, o, p, t) \cdot c_{var}(i, o, t)) \cdot DF^{-p} \\
 
@@ -110,7 +125,7 @@ whereby
 Constraints of the core model
 +++++++++++++++++++++++++++++
 
-The following constraints apply to a model in its basic formulation (i.e.
+The following constraints apply to a model in its very basic formulation (i.e.
 not including demand response and emissions limits):
 
 Investment variables interrelation
@@ -119,7 +134,7 @@ Investment variables interrelation
 * Investment bounds:
 
 .. math::
-    & P_{invest, min}(n, p) <= P_{invest}(n, p) <= P_{invest,max}(n, p) \\
+    & P_{invest, min}(n, p) \leq P_{invest}(n, p) \leq P_{invest,max}(n, p) \\
     & \forall \space n \in \mathrm{IF}, \space p \in \mathrm{P}
 
 
@@ -141,15 +156,15 @@ Investment variables interrelation
     &
     P_{old,end}(n, p) =
         \begin{cases} 0, & p=0 \\
-        P_{invest}(n, p_{comm}), & l \leq year(p) \\
-        P_{old,end}(p), & else \\
+        P_{invest}(n, p_{comm}), & l(n) \leq year(p) \quad (*) \\
+        0, & else \\
         \end{cases} \\
     & \forall \space n \in \mathrm{IF}, p \in \mathrm{P} \\
     &\\
     &
     P_{old,exo}(n, p) =
         \begin{cases} 0, & p=0 \\
-        P_{exist}(n) (*), & l - a \leq year(p) \\
+        P_{exist}(n), & l(n) - a(n) \leq year(p) \quad (**) \\
         0, & else \\
         \end{cases} \\
     & \forall \space n \in \mathrm{IF}, p \in \mathrm{P} \\
@@ -157,6 +172,9 @@ Investment variables interrelation
 whereby:
 
 * (*) is only performed for the first period the condition
+  is True. This is achieved by a matrix that keeps track of the unit
+  age per period and serves to determine commissioning periods.
+* (**) is only performed for the first period the condition
   is True. A decommissioning flag is then set to True
   to prevent having falsely added old capacity in future periods.
 * :math:`year(p)` is the year corresponding to period p
@@ -167,12 +185,13 @@ whereby:
   or exceeded that is than selected as decommissioning period for this particular
   investment.
 
+\
 
 * Overall maximum of total installed capacity (resp. energy)
 
 .. math::
     &
-    P_{total}(n, p) \leq P_{overall,max} \\
+    P_{total}(n, p) \leq P_{overall,max}(n) \\
     & \forall \space n \in \mathrm{IF}, \space p \in \mathrm{P}
 
 Power balance
@@ -204,12 +223,23 @@ AC transmission with a time-dependent maximum capacity and DC transmission with 
 
 .. math::
 
-    & f(i, o, p, t) \leq f_{max}(i, o, t) * P_{nom}(i, o) \\
-    & \space \forall (i, o), \space (i, o) \in \mathrm{IC}, \space (p, t) \in \mathrm{PT}
+    & f(i, o, p, t) \leq f_{max}(i, o, t) \cdot P_{nom}(i, o) \\
+    & \space \forall \space (i, o) \in \mathrm{IC}, \space (p, t) \in \mathrm{PT}
 
 whereby :math:`f(i, o, p, t)` denotes the flow via an interconnector that connects
-the exporting market area on the input side with the importing market area on the output
-side.
+the exporting market area on the input side :math:`i` with the importing market area on the output
+side :math:`o`.
+
+Demand
+======
+
+The baseline inflexible demand is given as a fixed time series per market area. In case of the presence of demand response,
+this time series is decreased accordingly for Germany by the baseline demand for demand response applications.
+
+* Fixed demand:
+
+    & f(i, o, p, t) = d(o, t) \cdot D_{max}(o) \\
+    & \forall \space o \in \mathrm{D}, \space i \in I(o), \space (p, t) \in \mathrm{PT}
 
 Renewable Generators
 ====================
@@ -222,11 +252,11 @@ a sink to collect the excess generation, though.
 
 .. math::
 
-    & f(i, o, p, t) = cf(i, o, t) * P_{nom}(i, o) \\
-    & \forall \space (i, o) \in \mathrm{RES}, \space (p, t) \in \mathrm{PT}
+    & f(i, o, p, t) = cf(i, t) \cdot P_{nom}(i) \\
+    & \forall \space i \in \mathrm{RES}, \space o \in O(i), \space (p, t) \in \mathrm{PT}
 
-The capacity factor :math:`cf(i, o, t)` is scaled accordingly to account for
-the renewable expansion.
+The capacity factor :math:`cf(i, t)` is scaled accordingly to account for
+renewable capacity expansion.
 
 Backup Generators
 =================
@@ -236,17 +266,21 @@ Backup Generators
 .. math::
     & P_{i}(n, p, t) \cdot \eta_{o}(n, t) =
     P_{o}(n, p, t) \cdot \eta_{i}(n, t), \\
-    & \forall \space (p, t) \in \mathrm{PT}, \space n \in \mathrm{TF},
-    \space i \in \mathrm{I(n)}, \space o \in \mathrm{O(n)}
+    & \forall \space n \in \mathrm{TF},
+    \space i \in \mathrm{I(n)}, \space o \in \mathrm{O(n)}, \space (p, t) \in \mathrm{PT}
 
-with :math:`P_{i}(n, p, t)` as the inflow into the transformer node n,
-:math:`P_{o}(n, p, t)` as the transformer outflow, :math:`\eta_{o}(n, t)` the
-conversion efficiency for outputs and :math:`\eta_{i}(n, t)` the conversion
-factors for inflows. We only use the conversion factor for outflows to account
-for losses from the conversion (within the power plant).
-:math:`\mathrm{TF}` is the set of transformers, i.e. any kind of energy conversion
-unit. We use this for conventional or carbon-neutral controllable backup generators
-as well as interconnection line losses.
+with
+
+* :math:`P_{i}(n, p, t)` as the inflow into the transformer node n,
+* :math:`P_{o}(n, p, t)` as the transformer outflow,
+* :math:`\eta_{o}(n, t)` the conversion efficiency for outputs and
+* :math:`\eta_{i}(n, t)` the conversion factors for inflows. We only use the conversion factor for outflows to account
+  for losses from the conversion (within the power plant).
+* :math:`\mathrm{TF}` is the set of transformers, i.e. any kind of energy conversion
+  unit. We use this for conventional or carbon-neutral controllable backup generators
+  as well as interconnection lines (see above), where we apply negligible losses.
+
+\
 
 * Minimum and maximum load requirements
 
@@ -254,7 +288,7 @@ as well as interconnection line losses.
 
     & f(i, o, p, t) \geq f_{min}(i, o, t) \cdot P_{nom}(i, o) \\
     & \forall \space (i, o) \in \mathrm{F} \setminus \mathrm{IF},
-    \space t \in \mathrm{T} \\
+    \space (p, t) \in \mathrm{PT} \\
     & \\
     & f(i, o, t) \leq f_{max}(i, o, t) \cdot P_{nom}(i, o) \\
     & \forall \space (i, o) \in \mathrm{F} \setminus \mathrm{IF},
@@ -264,19 +298,6 @@ with :math:`P_{nom}(i, o)` equalling to the installed resp. maximum capacity,
 :math:`f_{min}(i, o, t)` as the normalized minimum flow value
 and :math:`f_{max}(i, o, t)` as the normalized maximum flow value.
 
-For investment flows, :math:`P_{nom}(i, o)` is replaced by the total capacity,
-which leads to:
-
-.. math::
-
-    & f(i, o, p, t) \geq f_{min}(i, o, t) \cdot P_{total}(i, o) \\
-    & \forall \space (i, o) \in \mathrm{IF},
-    \space t \in \mathrm{T} \\
-    & \\
-    & f(i, o, p, t) \leq f_{max}(i, o, t) \cdot P_{total}(i, o) \\
-    & \forall \space (i, o) \in \mathrm{IF},
-    \space (p, t) \in \mathrm{PT}
-
 .. note::
 
     Both, the maximum and the minimum output may vary over time.
@@ -284,6 +305,19 @@ which leads to:
     and industrial power plants (IPP), where a minimum load pattern
     applies, or for exogenous installations or decommissionings, where
     the maximum is increased or decreased on an annual basis.
+
+For investment flows, :math:`P_{nom}(i, o)` is replaced by the total capacity,
+which leads to:
+
+.. math::
+
+    & f(i, o, p, t) \geq f_{min}(i, o, t) \cdot P_{total}(i, o, p) \\
+    & \forall \space (i, o) \in \mathrm{IF},
+    \space(p, t) \in \mathrm{PT} \\
+    & \\
+    & f(i, o, p, t) \leq f_{max}(i, o, t) \cdot P_{total}(i, o, p) \\
+    & \forall \space (i, o) \in \mathrm{IF},
+    \space (p, t) \in \mathrm{PT}
 
 Storages
 ========
@@ -302,14 +336,14 @@ initial storage content :math:`E(s, -1)`.
     The storage roundtrip condition is only applied to existing storage units.
     Storages that are invested into by the model, initially have a storage content of
     0. Since it would be costly for the model, not to withdraw all energy from the storage
-    until the last time point of the simulation, no additional roundtrip balancing
+    until the last time point of the optimization, no additional roundtrip balancing
     constraint is introduced.
 
 * Storage balance:
 
 .. math::
 
-    & E(s, t + 1) = E(s, t) \cdot (1 - \beta(s, t)) ^{\tau(t)/(t_u)} \\
+    E(s, t + 1) = & E(s, t) \cdot (1 - \beta(s, t)) ^{\frac {\tau(t)}{(t_u)}} \\
     & - \frac{\dot{E}_o(s, p, t)}{\eta_o(s, t)} \cdot \tau(t)
     + \dot{E}_i(s, p, t) \cdot \eta_i(s, t) \cdot \tau(t) \\
     & \forall \space s \in \mathrm{S}, \space (p, t) \in \mathrm{PT}
@@ -348,17 +382,17 @@ The latter is used as a default.
 
 .. math::
 
-    & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot ef(i, o) \leq EL \\
+    & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot e(i, o) \leq EL \\
     & \space (i, o) \in \mathrm{F}
 
-with :math:`ef(i, o)` as the specific emission factor and :math:`EL` as the
+with :math:`e(i, o)` as the specific emission factor and :math:`EL` as the
 overall emission budget (cap) for the overall optimization time frame.
 
 * Annual emissions limit:
 
 .. math::
 
-    & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot ef(i, o) \leq EL(p) \\
+    & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot e(i, o) \leq EL(p) \\
     & \space (i, o) \in \mathrm{F}, \space \forall p \in \mathrm{P}
 
 Demand Response
