@@ -568,7 +568,7 @@ are given separately for each approach:
 
     \sum_{n \in \mathrm{DR}} & (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
     &
-    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p} \\
+    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp} \cdot DF^{-p} \\
     &
     + \sum_{p \in \mathrm{P}} \sum_{t \in \mathrm{T}} (DSM_{n, t}^{up} \cdot cost_{n, t}^{dsm, up} + DSM_{n, t}^{do, shift} \cdot cost_{n, t}^{dsm, do, shift} \\
     &
@@ -634,7 +634,7 @@ are given separately for each approach:
 
     \sum_{n \in \mathrm{DR}} & (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
     &
-    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p} \\
+    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp} \cdot DF^{-p} \\
     &
     + \sum_{p \in \mathrm{P}} \sum_{t \in \mathrm{T}} (DSM_{n, t}^{up} \cdot cost_{n, t}^{dsm, up} + DSM_{n, t}^{do, shift} \cdot cost_{n, t}^{dsm, do, shift} \\
     &
@@ -649,96 +649,97 @@ are given separately for each approach:
     (1) \quad DSM_{h, t}^{up} = 0 \\
     & \quad \quad \quad \quad \forall h \in H_{DR}, t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shift} = \textrm{False} \\
-    & \\
     &
     (2) \quad DSM_{t}^{do, shed} = 0 \\
     & \quad \quad \quad \quad \forall t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shed} = \textrm{False} \\
     & \\
     &
-    (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max} \\
-    & \quad \quad \quad \quad + \displaystyle\sum_{h=1}^{H_{DR}}
-    (DSM_{h, t}^{up}
+    (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max}(p) \\
+    & + \displaystyle\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{up}
     + DSM_{h, t}^{balanceDo} - DSM_{h, t}^{do, shift}
     - DSM_{h, t}^{balanceUp}) - DSM_{t}^{do, shed} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (4) \quad DSM_{h, t}^{balanceDo} =
     \frac{DSM_{h, t - h}^{do, shift}}{\eta} \\
-    & \quad \quad \quad \quad \forall h \in H_{DR}, t \in [h..T] \\
+    & \quad \quad \quad \quad \forall h \in H_{DR}, \space t \in [h..T] \\
     & \\
     &
     (5) \quad DSM_{h, t}^{balanceUp} =
     DSM_{h, t-h}^{up} \cdot \eta \\
-    & \quad \quad \quad \quad \forall h \in H_{DR}, t \in [h..T] \\
+    & \quad \quad \quad \quad \forall h \in H_{DR}, \space t \in [h..T] \\
     & \\
     &
-    (6) \quad DSM_{h, t}^{do, shift} = 0
-    \quad \forall h \in H_{DR} \\
-    & \quad \quad \quad \quad \forall t \in [T - h..T] \\
+    (6) \quad DSM_{h, t}^{do, shift} = 0 \\
+    & \quad \quad \quad \quad \forall h \in H_{DR}, \space t \in [T - h..T] \\
     & \\
     &
-    (7) \quad DSM_{h, t}^{up} = 0
-    \quad \forall h \in H_{DR}  \\
-    & \quad \quad \quad \quad \forall t \in [T - h..T] \\
+    (7) \quad DSM_{h, t}^{up} = 0 \\
+    & \quad \quad \quad \quad \forall h \in H_{DR}, \space t \in [T - h..T] \\
     & \\
     &
     (8) \quad \displaystyle\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{do, shift}
     + DSM_{h, t}^{balanceUp}) + DSM_{t}^{do, shed}
-    \leq E_{t}^{do} \cdot E_{max, do} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
+    \leq E_{t}^{do} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad  \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (9) \quad \displaystyle\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{up}
     + DSM_{h, t}^{balanceDo})
-    \leq E_{t}^{up} \cdot E_{max, up} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
+    \leq E_{t}^{up} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad  \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (10) \quad \Delta t \cdot \displaystyle\sum_{h=1}^{H_{DR}}
     (DSM_{h, t}^{do, shift} - DSM_{h, t}^{balanceDo} \cdot \eta)
     = W_{t}^{levelDo} - W_{t-1}^{levelDo} \\
-    & \quad \quad \quad \quad  \forall t \in [1..T] \\
+    & \quad \quad \quad \quad \forall t \in [1..T] \\
     & \\
     &
     (11) \quad \Delta t \cdot \displaystyle\sum_{h=1}^{H_{DR}}
     (DSM_{h, t}^{up} \cdot \eta - DSM_{h, t}^{balanceUp})
     = W_{t}^{levelUp} - W_{t-1}^{levelUp} \\
-    & \quad \quad \quad \quad  \forall t \in [1..T] \\
+    & \quad \quad \quad \quad \forall t \in [1..T] \\
     & \\
     &
     (12) \quad W_{t}^{levelDo} \leq \overline{E}_{t}^{do}
-    \cdot E_{max, do} \cdot t_{shift} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
+    \cdot P_{total}(p) \cdot t_{shift} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (13) \quad W_{t}^{levelUp} \leq \overline{E}_{t}^{up}
-    \cdot E_{max, up} \cdot t_{shift} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
+    \cdot P_{total}(p)  \cdot t_{shift} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (14) \quad \displaystyle\sum_{t=0}^{T} DSM_{t}^{do, shed}
-    \leq E_{max, do} \cdot \overline{E}_{t}^{do} \cdot t_{shed}
+    \leq P_{total}(p) \cdot \overline{E}_{t}^{do}
+    \cdot t_{shed}
     \cdot n^{yearLimitShed} \\
     & \\
     &
     (15) \quad \displaystyle\sum_{t=0}^{T} \sum_{h=1}^{H_{DR}}
     DSM_{h, t}^{do, shift}
-    \leq E_{max, do} \cdot \overline{E}_{t}^{do} \cdot t_{shift}
+    \leq P_{total}(p)
+    \cdot \overline{E}_{t}^{do}
+    \cdot t_{shift}
     \cdot n^{yearLimitShift} \\
     & \quad \quad \textrm{(optional constraint)} \\
     & \\
     &
     (16) \quad \displaystyle\sum_{t=0}^{T} \sum_{h=1}^{H_{DR}}
     DSM_{h, t}^{up}
-    \leq E_{max, up} \cdot \overline{E}_{t}^{up} \cdot t_{shift}
+    \leq P_{total}(p)
+    \cdot \overline{E}_{t}^{up}
+    \cdot t_{shift}
     \cdot n^{yearLimitShift} \\
     & \quad \quad \textrm{(optional constraint)} \\
-    & \\
     &
     (17) \quad \displaystyle\sum_{h=1}^{H_{DR}} DSM_{h, t}^{do, shift}
-    \leq E_{max, do} \cdot \overline{E}_{t}^{do}
+    \leq P_{total}(p)
+    \cdot \overline{E}_{t}^{do}
     \cdot t_{shift} -
     \displaystyle\sum_{t'=1}^{t_{dayLimit}} \sum_{h=1}^{H_{DR}}
     DSM_{h, t - t'}^{do, shift} \\
@@ -747,35 +748,36 @@ are given separately for each approach:
     & \\
     &
     (18) \quad \displaystyle\sum_{h=1}^{H_{DR}} DSM_{h, t}^{up}
-    \leq E_{max, up} \cdot \overline{E}_{t}^{up}
+    \leq (invest + E_{exist})
+    \cdot \overline{E}_{t}^{up}
     \cdot t_{shift} -
     \displaystyle\sum_{t'=1}^{t_{dayLimit}} \sum_{h=1}^{H_{DR}}
     DSM_{h, t - t'}^{up} \\
     & \quad \quad \quad \quad \forall t \in [t-t_{dayLimit}..T] \\
-    & \quad \quad \textrm{(optional constraint)}  \\
+    & \quad \quad \textrm{(optional constraint)} \\
     & \\
     &
     (19) \quad \displaystyle\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{up}
     + DSM_{h, t}^{balanceDo}
-    + DSM_{h, t}^{do, shift} + DSM_{h, t}^{balanceUp})
-    + DSM_{t}^{do, shed} \\
-    & \quad \quad \leq \max \{E_{t}^{up} \cdot E_{max, up},
-    E_{t}^{do} \cdot E_{max, do} \} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
-    & \quad \quad \textrm{(optional constraint)}  \\
+    + DSM_{h, t}^{do, shift} + DSM_{h, t}^{balanceUp}) \\
+    & \quad \quad \quad + DSM_{t}^{shed} \leq \max \{E_{t}^{up}, E_{t}^{do} \} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad \forall (p, t) \in \textrm{TIMEINDEX} \\
+    & \quad \quad \textrm{(optional constraint)} \\
+    &
 
-* Objective function term:
+* Objective function term (added to objective function above):
 
 .. math::
+
+    \sum_{n \in \mathrm{DR}} & (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
     &
-    (\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{up} + DSM_{h, t}^{balanceDo})
-    \cdot cost_{t}^{dsm, up} \\
-    & + \sum_{h=1}^{H_{DR}} (DSM_{h, t}^{do, shift}
-    + DSM_{h, t}^{balanceUp})
-    \cdot cost_{t}^{dsm, do, shift} \\
-    & + DSM_{t}^{do, shed} \cdot cost_{t}^{dsm, do, shed})
-    \cdot \omega_{t} \\
-    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
+    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp} \cdot DF^{-p} \\
+    &
+    + \sum_{p \in \mathrm{P}} \sum_{t \in \mathrm{T}} \sum_{h \in H_{DR}} ((DSM_{n, h, t}^{up} + DSM_{n, h, t}^{balanceDo}) \cdot cost_{n, t}^{dsm, up} \\
+    &
+    + (DSM_{n, h, t}^{do, shift} + DSM_{n, h, t}^{balanceUp}) \cdot cost_{n, t}^{dsm, do, shift} \\
+    &
+    + DSM_{n, t}^{do, shed} \cdot cost_{n, t}^{dsm, do, shed}) \cdot \omega_{t} \cdot DF^{-p}) \\
 
 Electric Vehicles
 =================
