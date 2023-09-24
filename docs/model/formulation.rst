@@ -238,6 +238,8 @@ this time series is decreased accordingly for Germany by the baseline demand for
 
 * Fixed demand:
 
+.. math::
+
     & f(i, o, p, t) = d(o, t) \cdot D_{max}(o) \\
     & \forall \space o \in \mathrm{D}, \space i \in I(o), \space (p, t) \in \mathrm{PT}
 
@@ -373,10 +375,13 @@ Emissions limit
 ===============
 
 ``pommesinvest`` allows to select between two optional investment limits:
+
 * an overall emissions budget limit for the entire optimization timeframe that
-the model is free to distribute over time and
+  the model is free to distribute over time and
 * an annual emissions limit that is defined on a periodical, i.e. annual basis.
-The latter is used as a default.
+  The latter is used as a default.
+
+\
 
 * Overall emissions budget:
 
@@ -395,16 +400,18 @@ overall emission budget (cap) for the overall optimization time frame.
     & \sum_{(i,o)} \sum_t f(i, o, p, t) \cdot \tau(t) \cdot e(i, o) \leq EL(p) \\
     & \space (i, o) \in \mathrm{F}, \space \forall p \in \mathrm{P}
 
+with :math:`EL(p)` as the emission budget (cap) for period :math:`p`.
+
 Demand Response
 ===============
 
 Since demand response is one of the key interest points of *POMMES*, there
 are three different implementations which can be chosen from:
 
-    * *DIW*: Based on a paper by Zerrahn and Schill (2015), pp. 842-843.
-    * *DLR*: Based on the PhD thesis of Gils (2015)
+    * *DIW*: Based on a paper by Zerrahn and Schill (2015), pp. 842-843,
+    * *DLR*: Based on the PhD thesis of Gils (2015) or
     * *oemof*: Created by Julian Endres. A fairly simple DSM representation
-      which demands the energy balance to be levelled out in fixed cycles
+      which demands the energy balance to be levelled out in fixed cycles.
 
     An evaluation of different modeling approaches has been carried out and
     presented at the INREC 2020 (Kochems 2020). Some of the results are as follows:
@@ -413,7 +420,7 @@ are three different implementations which can be chosen from:
       leads to an over- nor underestimization of potentials and balances
       modeling detail and computation intensity.
     * *DIW*: A solid implementation with the tendency of slight overestimization
-      of potentials since a `shift_time` is not included. It may get
+      of potentials since a shift time :math:`t_{shift}` is not included. It may get
       computationally expensive due to a high time-interlinkage in constraint
       formulations.
     * *oemof*: A very computationally efficient approach which only requires the
@@ -423,12 +430,15 @@ are three different implementations which can be chosen from:
       Note that approach `oemof` does allow for load shedding,
       but does not impose a limit on maximum amount of shedded energy.
 
+One of the approaches has to be selected by the user upfront. It does not
+make sense to mix different approaches, though this would be technically feasible.
+
 .. note::
 
     Since the contraints around the definition of the relationship between the
     investment-related parameters :math:`P_{total}(n, p)`, :math:`P_{invest}(n, p)`
-    and :math:`P_{old}(n, p)` with n denoting the node (e.g. the demand response cluster)
-    and p denoting the respective period are basically identical to those for other
+    and :math:`P_{old}(n, p)` with :math:`n` denoting the node (e.g. the demand response cluster)
+    and :math:`p` denoting the respective period are basically identical to those for other
     investments (InvestmentFlows, GenericStorages), these are not explicitly stated
     here, but of course are incorporated in the model. Instead, only the differences
     is focussed upon in the following section.
@@ -480,7 +490,7 @@ response modeling are listed separately in the following table:
     :math:`\tau`                      P    | interval (time within which the                                    oemof
                                            | energy balance must be levelled out)
     :math:`\eta`                      P    Efficiency for load shifting processes                               all
-    :math:`\mathbb{T}`                P    Time steps of the model                                              all
+    :math:`\mathrm{T}`                P    Time steps of the model                                              all
     :math:`e_{shift}`                 P    | Boolean parameter indicating if unit can be used                   all
                                            | for load shifting
     :math:`e_{shed}`                  P    | Boolean parameter indicating if unit can be used                   all
@@ -508,13 +518,13 @@ are given separately for each approach:
 
 .. note::
 
-    | The constraints and objective terms hold for all demand response units which are
-    | aggregated to demand response clusters (with homogeneous costs and delay resp. shifting times).
-    | For the sake of readability, the technology index is not displayed except for the target function term
-    | which sums across the different demand response clusters.
-    | Furthermore, for some constraints there may be index violations which are taken care of by
-    | limiting to the feasible time indices :math:`{0, 1, .., |T|}`. This is also not displayed for the sake of readability.
-    | For the complete implementation and details, please refer to `the sink_dsm module of oemof.solph <https://github.com/oemof/oemof-solph/blob/master/src/oemof/solph/experimental/_sink_dsm.py>`_.
+    * The constraints and objective terms hold for all demand response units which are
+      aggregated to demand response clusters (with homogeneous costs and delay resp. shifting times).
+    * For the sake of readability, the technology index is not displayed except for the target function term
+      which sums across the different demand response clusters.
+    * Furthermore, for some constraints there may be index violations which are taken care of by
+      limiting to the feasible time indices :math:`{0, 1, .., |T|}`. This is also not displayed for the sake of readability.
+    * For the complete implementation and details, please refer to `the sink_dsm module of oemof.solph <https://github.com/oemof/oemof-solph/blob/master/src/oemof/solph/experimental/_sink_dsm.py>`_.
 
 **approach `oemof`**:
 
@@ -523,46 +533,46 @@ are given separately for each approach:
 .. math::
     &
     (1) \quad DSM_{t}^{up} = 0 \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T}
+    & \quad \quad \quad \quad \forall t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shift} = \textrm{False} \\
     & \\
     &
     (2) \quad DSM_{t}^{do, shed} = 0 \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T}
+    & \quad \quad \quad \quad \forall t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shed} = \textrm{False} \\
     & \\
     &
     (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max}(p)
     + DSM_{t}^{up}
     - DSM_{t}^{do, shift} - DSM_{t}^{do, shed} \\
-    & \quad \quad \quad \quad \forall (p, t) \in \mathbb{PT} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (4) \quad  DSM_{t}^{up} \leq E_{t}^{up} \cdot P_{total}(p) \\
-    & \quad \quad \quad \quad \forall (p, t) \in \mathbb{PT} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (5) \quad DSM_{t}^{do, shift} +  DSM_{t}^{do, shed} \leq
     E_{t}^{do} \cdot P_{total}(p) \\
-    & \quad \quad \quad \quad \forall (p, t) \in \mathbb{PT} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (6) \quad  \sum_{t=t_s}^{t_s+\tau} DSM_{t}^{up} \cdot \eta =
     \sum_{t=t_s}^{t_s+\tau} DSM_{t}^{do, shift} \\
     & \quad \quad \quad \quad \forall t_s \in
-    \{k \in \mathbb{T} \mid k \mod \tau = 0\} \\
+    \{k \in \mathrm{T} \mid k \mod \tau = 0\} \\
 
 * Objective function term (added to objective function above):
 
 .. math::
-    &
-    \sum_{n \in \mathrm{DR}} (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
+
+    \sum_{n \in \mathrm{DR}} & (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
     &
     + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p} \\
     &
     + \sum_{p \in \mathrm{P}} \sum_{t \in \mathrm{T}} (DSM_{n, t}^{up} \cdot cost_{n, t}^{dsm, up} + DSM_{n, t}^{do, shift} \cdot cost_{n, t}^{dsm, do, shift} \\
     &
-    + DSM_{n, t}^{do, shed} \cdot cost_{n, t}^{dsm, do, shed}) \cdot \omega_{t} \cdot DF^{-p} \\
+    + DSM_{n, t}^{do, shed} \cdot cost_{n, t}^{dsm, do, shed}) \cdot \omega_{t} \cdot DF^{-p}) \\
 
 **approach `DIW`**:
 
@@ -571,60 +581,64 @@ are given separately for each approach:
 .. math::
     &
     (1) \quad DSM_{t}^{up} = 0 \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T}
+    & \quad \quad \quad \quad \forall t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shift} = \textrm{False} \\
     & \\
     &
     (2) \quad DSM_{t}^{do, shed} = 0 \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T}
+    & \quad \quad \quad \quad \forall t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shed} = \textrm{False} \\
     & \\
     &
-    (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max} + DSM_{t}^{up} -
+    (3) \quad \dot{E}_{t} = demand_{t} \cdot demand_{max}(p)
+    + DSM_{t}^{up} -
     \sum_{tt=t-L}^{t+L} DSM_{tt,t}^{do, shift} - DSM_{t}^{do, shed} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (4) \quad DSM_{t}^{up} \cdot \eta =
     \sum_{tt=t-L}^{t+L} DSM_{t,tt}^{do, shift} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
-    (5) \quad DSM_{t}^{up} \leq E_{t}^{up} \cdot E_{up, max} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    (5) \quad DSM_{t}^{up} \leq E_{t}^{up} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
     (6) \quad \sum_{t=tt-L}^{tt+L} DSM_{t,tt}^{do, shift}
-    + DSM_{tt}^{do, shed} \leq E_{tt}^{do} \cdot E_{do, max} \\
-    & \quad \quad \quad \quad \forall tt \in \mathbb{T} \\
+    + DSM_{tt}^{do, shed} \leq E_{tt}^{do} \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
     (7) \quad DSM_{tt}^{up} + \sum_{t=tt-L}^{tt+L} DSM_{t,tt}^{do, shift}
-    + DSM_{tt}^{do, shed} \leq
-    max \{ E_{tt}^{up} \cdot E_{up, max},
-    E_{tt}^{do} \cdot E_{do, max} \} \\
-    & \quad \quad \quad \quad \forall tt \in \mathbb{T} \\
+    + DSM_{tt}^{do, shed} \leq max \{ E_{tt}^{up}, E_{tt}^{do} \}
+    \cdot P_{total}(p) \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
     & \\
     &
-    (8) \quad \sum_{tt=t}^{t+R_{shi}-1} DSM_{tt}^{up}
-    \leq E_{t}^{up} \cdot E_{up, max} \cdot L \cdot \Delta t \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    (8) \quad \sum_{tt=t}^{t+R-1} DSM_{tt}^{up}
+    \leq E_{t}^{up} \cdot P_{total}(p)
+    \cdot L \cdot \Delta t \\
+    & \quad \quad \quad \quad \forall (p, t)  \in \mathrm{PT} \\
     & \\
     &
-    (9) \quad \sum_{tt=t}^{t+R_{she}-1} DSM_{tt}^{do, shed}
-    \leq E_{t}^{do} \cdot E_{do, max} \cdot t_{shed} \cdot \Delta t \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    (9) \quad \sum_{tt=t}^{t+R-1} DSM_{tt}^{do, shed}
+    \leq E_{t}^{do} \cdot P_{total}(p)
+    \cdot t_{shed}
+    \cdot \Delta t \\
+    & \quad \quad \quad \quad \forall (p, t) \in \mathrm{PT} \\
 
-* Objective function term:
+* Objective function term (added to objective function above):
 
 .. math::
+
+    \sum_{n \in \mathrm{DR}} & (\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \cdot DF^{-p} \\
     &
-    (DSM_{t}^{up} \cdot cost_{t}^{dsm, up}
-    + \sum_{tt=0}^{T} DSM_{t, tt}^{do, shift} \cdot
-    cost_{t}^{dsm, do, shift}
-    + DSM_{t}^{do, shed} \cdot cost_{t}^{dsm, do, shed})
-    \cdot \omega_{t} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    + \sum_{pp=year(p)}^{year(p)+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p} \\
+    &
+    + \sum_{p \in \mathrm{P}} \sum_{t \in \mathrm{T}} (DSM_{n, t}^{up} \cdot cost_{n, t}^{dsm, up} + DSM_{n, t}^{do, shift} \cdot cost_{n, t}^{dsm, do, shift} \\
+    &
+    + DSM_{n, t}^{do, shed} \cdot cost_{n, t}^{dsm, do, shed}) \cdot \omega_{t} \cdot DF^{-p}) \\
 
 **approach `DLR`**:
 
@@ -633,12 +647,12 @@ are given separately for each approach:
 .. math::
     &
     (1) \quad DSM_{h, t}^{up} = 0 \\
-    & \quad \quad \quad \quad \forall h \in H_{DR}, t \in \mathbb{T}
+    & \quad \quad \quad \quad \forall h \in H_{DR}, t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shift} = \textrm{False} \\
     & \\
     &
     (2) \quad DSM_{t}^{do, shed} = 0 \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T}
+    & \quad \quad \quad \quad \forall t \in \mathrm{T}
     \quad \textrm{if} \quad e_{shed} = \textrm{False} \\
     & \\
     &
@@ -647,7 +661,7 @@ are given separately for each approach:
     (DSM_{h, t}^{up}
     + DSM_{h, t}^{balanceDo} - DSM_{h, t}^{do, shift}
     - DSM_{h, t}^{balanceUp}) - DSM_{t}^{do, shed} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
     (4) \quad DSM_{h, t}^{balanceDo} =
@@ -673,13 +687,13 @@ are given separately for each approach:
     (8) \quad \displaystyle\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{do, shift}
     + DSM_{h, t}^{balanceUp}) + DSM_{t}^{do, shed}
     \leq E_{t}^{do} \cdot E_{max, do} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
     (9) \quad \displaystyle\sum_{h=1}^{H_{DR}} (DSM_{h, t}^{up}
     + DSM_{h, t}^{balanceDo})
     \leq E_{t}^{up} \cdot E_{max, up} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
     (10) \quad \Delta t \cdot \displaystyle\sum_{h=1}^{H_{DR}}
@@ -696,12 +710,12 @@ are given separately for each approach:
     &
     (12) \quad W_{t}^{levelDo} \leq \overline{E}_{t}^{do}
     \cdot E_{max, do} \cdot t_{shift} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
     (13) \quad W_{t}^{levelUp} \leq \overline{E}_{t}^{up}
     \cdot E_{max, up} \cdot t_{shift} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \\
     &
     (14) \quad \displaystyle\sum_{t=0}^{T} DSM_{t}^{do, shed}
@@ -747,7 +761,7 @@ are given separately for each approach:
     + DSM_{t}^{do, shed} \\
     & \quad \quad \leq \max \{E_{t}^{up} \cdot E_{max, up},
     E_{t}^{do} \cdot E_{max, do} \} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
     & \quad \quad \textrm{(optional constraint)}  \\
 
 * Objective function term:
@@ -761,7 +775,7 @@ are given separately for each approach:
     \cdot cost_{t}^{dsm, do, shift} \\
     & + DSM_{t}^{do, shed} \cdot cost_{t}^{dsm, do, shed})
     \cdot \omega_{t} \\
-    & \quad \quad \quad \quad \forall t \in \mathbb{T} \\
+    & \quad \quad \quad \quad \forall t \in \mathrm{T} \\
 
 Electric Vehicles
 =================
