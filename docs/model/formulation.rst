@@ -20,16 +20,16 @@ Nomenclature
     | This comprises Sources, Sinks, Buses, Transformers,
     | GenericStorages and optionally DSMSinks"
     ":math:`T`", "S", "| all time steps within the optimization time frame
-    | (and time increment, i.e. frequency) chosen"
+    | (and time increment :math:`\tau(t)`, i.e. frequency) chosen"
     ":math:`P`", "S", "| all periods (i.e. years) within the optimization time frame
     | chosen"
-    ":math:`PT`", "S", "| all periods and time steps, whereby the first value
-    | denotes the period and the second one the time step"
+    ":math:`PT`", "S", "| all periods and time steps, whereby in this set of tuples, the first value
+    | of a tuple denotes the period and the second one the time step"
     ":math:`F`", "S", "| all flows of the energy system.
     | A flow is a directed connection between node A and B
     | and has a (non-negative) value (i.e. capacity flow) for every time step"
     ":math:`IF`", "S", "| all flows or nodes of the energy system that can be invested into.
-    | Comprises InvestmentFlows, GenericStorages and DSMSinks"
+    | Comprises InvestmentFlows (flows), GenericStorages (nodes) and DSMSinks (nodes)"
     ":math:`RES`", "S", "all renewable generators"
     ":math:`TF`", "S", "all transformers (i.e. conversion units, such as generators)"
     ":math:`B`", "S", "all buses (fictitious bus bars to connect capacity resp. energy flows)"
@@ -43,20 +43,20 @@ Nomenclature
     ":math:`P_{old}(n, p)`", "V", "| old installed capacity for node n
     | to be decommissioned at the beginning of period p"
     ":math:`P_{old,exo}(n, p)`", "V", "| old installed capacity from exogenous investments,
-    | i.e. from capacity that has initially been existing,
-    | for node n to be decommissioned at the beginning of period p"
+    | i.e. from capacity that has initially been existing, for node n
+    | to be decommissioned at the beginning of period p"
     ":math:`P_{old,end}(n, p)`", "V", "| old installed capacity from endogenous investments,
-    | i.e. from investments that have been chosen by the optimization model
-    | and reached their lifetime within the optimization time frame,
-    | for node n to be decommissioned at the beginning of period p"
+    | i.e. from investments that have been chosen by the optimization model and reached their lifetime
+    | within the optimization time frame, for node n
+    | to be decommissioned at the beginning of period p"
     ":math:`f(i,o,p,t)`", "V", "| Flow from node i (input) to node o (output)
     | in period p and at time step t"
     ":math:`C`", "V", "system costs"
     ":math:`P_{i}(n, p, t)`", "V", "inflow into transformer n in period p and at time step t"
     ":math:`P_{o}(n, p, t)`", "V", "outflow from transformer n in period p and at time step t"
     ":math:`E(s, t)`", "V", "energy currently stored in storage s"
-    ":math:`A(c_{invest}(n, p), l(n), i(n))`", "P", "| annualised investment costs for investments into node or flow n
-    | in period p, with lifetime l and interest rate i"
+    ":math:`A(c_{invest}(n, p), l(n), i(n))`", "P", "| annualised investment costs for investments into node
+    | or flow n in period p, with lifetime l and interest rate i"
     ":math:`l(n)`", "P", "| lifetime of investments into flow or node n
     | (varied per technology)"
     ":math:`a(n)`", "P", "initial age of existing capacity of flow or node n"
@@ -109,9 +109,9 @@ oemof.solph components used (`see the oemof.solph.models module <https://github.
 
 .. math::
 
-    Min \space C = & \sum_{n \in \mathrm{IF}} ((\sum_{p \in \mathrm{P}} P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \\
-    & + \sum_{pp=p}^{p+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \\
-    & + \sum_{(i,o) \in \mathrm{F}} \sum_{p \in \mathrm {P}} \sum_{t \in \mathrm {T}} f(i, o, p, t) \cdot c_{var}(i, o, t)) \cdot DF^{-p} \\
+    Min \space C = & \sum_{n \in \mathrm{IF}} (\sum_{p \in \mathrm{P}} (P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \\
+    & + \sum_{pp=p}^{p+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p}) \\
+    & + \sum_{(i,o) \in \mathrm{F}} \sum_{p \in \mathrm {P}} \sum_{t \in \mathrm {T}} f(i, o, p, t) \cdot c_{var}(i, o, t) \cdot DF^{-p} \\
 
 whereby
 
@@ -177,7 +177,7 @@ whereby:
 * (**) is only performed for the first period the condition
   is True. A decommissioning flag is then set to True
   to prevent having falsely added old capacity in future periods.
-* :math:`year(p)` is the year corresponding to period p
+* :math:`year(p)` is the year corresponding to the beginning of period p.
 * :math:`p_{comm}` is the commissioning period of the flow
   (which is determined by the model itself). For determining the commissioning
   period, a matrix is used that keeps track of unit age per period. This is used
@@ -209,7 +209,7 @@ with :math:`\tau(t)` equalling to the time increment (defaults to 1 hour)
 
 .. note::
 
-    This is equal to an overall energy balance requirement, but build up
+    This is equal to an overall energy balance requirement, but built up
     decentrally from a balancing requirement of every bus, thus allowing for
     a flexible expansion of the system size.
 
@@ -217,7 +217,7 @@ Power Transmission
 ==================
 
 There are two kinds of power transmission options between market areas:
-AC transmission with a time-dependent maximum capacity and DC transmission with a fixed maximum capacity
+AC transmission with a time-dependent maximum capacity and DC transmission with a fixed maximum capacity.
 
 * Maximum exchange between market areas:
 
