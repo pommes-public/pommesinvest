@@ -1809,13 +1809,6 @@ def create_electric_vehicles(
                                 f"storage_el_battery",
                             ]
                         ).to_numpy(),
-                        max=(
-                            input_data["electric_vehicles_ts"].loc[
-                                im.start_time : im.end_time,
-                                # soc upper; hack - list is rendered as string
-                                c["time_series"].split(",")[2][2:-2],
-                            ]
-                        ).to_numpy(),
                     )
                 },
                 nominal_storage_capacity=c["nominal_value"],
