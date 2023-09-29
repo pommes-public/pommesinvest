@@ -262,6 +262,7 @@ class InvestmentModel(object):
 
     write_lp_file : boolean
         boolean control variable indicating whether to save an lp file
+
         *CAUTION*: Only use for debugging when simulating small time frames
 
     extract_duals : boolean
@@ -278,6 +279,7 @@ class InvestmentModel(object):
     sensitivity_parameter: str
         Parameter for which to consider sensitivities;
         Supported sensitivities are
+
         - "None": no sensitivity
         - "PV": Different split between solar PV and wind onshore for Germany
           (higher / lower PV generation)
@@ -287,6 +289,7 @@ class InvestmentModel(object):
     sensitivity_value: str
         Sensitivity to consider;
         Supported values are
+
         - "None": No sensitivity
         - "-50%": 50% lower value compared to normal one
         - "-25%": 25% lower value compared to normal one

@@ -36,7 +36,7 @@ it and then clone the repository, in order to copy the files locally by typing
 
 | After cloning the repository, you have to install the required dependencies.
  In case you have conda (or a suitable alternative) installed as a package manager,
-you may follow along.
+ you may follow along.
  If not, you can download conda `here <https://www.anaconda.com/>`_.
 | Open a command shell and navigate to the folder
  where you copied the environment to.
