@@ -1835,7 +1835,7 @@ def create_electric_vehicles(
                 ),
                 inflow_conversion_factor=c["efficiency_el"],
                 outflow_conversion_factor=c["efficiency_discharging_el"],
-                balanced=True,
+                balanced=False,
             )
         elif component_type == "sink":
             if "_uc" not in i:
