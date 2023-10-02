@@ -363,7 +363,8 @@ with :math:`E_{nom}(s)` as the nominal storage capacity,
         & \forall \space s \in \mathrm{S}, \space t \in \mathrm{T}
 
 with :math:`E_{min}(s, t)` as the minimum and :math:`E_{max}(s, t)`
-as the maximum allowed storage content for time step t.
+as the maximum allowed storage content for time step t. For reservoir storages,
+these are derived from the historically observed filling rates.
 
 Constraints for core model extensions
 +++++++++++++++++++++++++++++++++++++
