@@ -856,7 +856,7 @@ uncontrolled charging (fixed demand time series), unidirectional controlled char
     & \quad \quad \forall \space o \in \mathrm{S_{CC,bi}}, \space i \in I(o), \space (p, t) \in \mathrm{PT} \\
     & \\
     & (5) \quad f(i, o, p, t) = d(o, t) \cdot D_{max}(o) \\
-    & \quad \quad \forall \space o \in \mathrm{EV_{CC,uni}}, \space i \in I(o), \space (p, t) \in \mathrm{PT} \\
+    & \quad \quad \forall \space o \in \mathrm{EV_{CC,bi}}, \space i \in I(o), \space (p, t) \in \mathrm{PT} \\
     & \\
     & (6) \quad f(i, o, p, t) \leq avail_{CC}(o, t) \cdot P_{in,max}(o) \\
     & \quad \quad \forall \space o \in \mathrm{B_{CC,bi}}, \space i \in I(o), \space (p, t) \in \mathrm{PT} \\
