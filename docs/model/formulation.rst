@@ -93,6 +93,11 @@ Nomenclature
     ":math:`e(i, o)`", "P", "emission factor in :math:`t \space \frac {CO_2}{MWh}`"
     ":math:`EL`", "P", "overall emission limit in :math:`t \space CO_2`"
     ":math:`EL(p)`", "P", "annual overall emission limit in :math:`t \space CO_2`"
+    ":math:`d(n, p)`", "P", "| duration, i.e. number of years that annuities for investment
+    | into flow or node :math:`n` occuring in period :math:`p` are accounted for"
+    ":math:`year_{max}`", "P", "last year of the optimization horizon (end of last period)"
+    ":math:`ANF(d(n, p), i(n))`", "P", "annuity factor for duration :math:`d(n, p)` and interest rate :math:`i(n)`"
+    ":math:`limit_{end}(n, p)`", "P", "parameter ensuring fixed costs are within optimization horizon"
 
 
 Target function
@@ -109,18 +114,39 @@ oemof.solph components used (`see the oemof.solph.models module <https://github.
 
 .. math::
 
-    Min \space C = & \sum_{n \in \mathrm{IF}} (\sum_{p \in \mathrm{P}} (P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n)) \cdot l(n) \\
-    & + \sum_{pp=p}^{p+l(n)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p}) \\
+    Min \space C = & \sum_{n \in \mathrm{IF}} (\sum_{p \in \mathrm{P}} (P_{invest}(n, p) \cdot A(c_{invest}(n, p), l(n), i(n))
+    \cdot \frac {1}{ANF(d(n, p), i(n))}  \\
+    & + \sum_{pp=p}^{limit_{end}(n, p)} P_{invest}(n, p) \cdot c_{fixed}(n, pp) \cdot DF^{-pp}) \cdot DF^{-p}) \\
     & + \sum_{(i,o) \in \mathrm{F}} \sum_{p \in \mathrm {P}} \sum_{t \in \mathrm {T}} f(i, o, p, t) \cdot c_{var}(i, o, t) \cdot DF^{-p} \\
 
-whereby
+with
+
+* Annuity :math:`A(c_{invest}(n, p), l(n), i(n))`
 
 .. math::
 
-    & A(c_{invest}(n, p), l(n), i(n)) = c_{invest}(n, p) \cdot
-    \frac {(1+i(n))^{l(n)} \cdot i(n)} {(1+i(n))^{l(n)} - 1} \\
-    & \\
-    & DF=(1+dr)
+    A(c_{invest}(n, p), l(n), i(n)) = c_{invest}(n, p) \cdot
+    \frac {(1+i(n))^{l(n)} \cdot i(n)} {(1+i(n))^{l(n)} - 1}
+
+* Discount factor :math:`DF`
+
+.. math::
+    DF=(1+dr)
+
+* Annuity factor :math:`ANF(d(n, p), i(n))`
+
+.. math::
+    ANF(d(n, p), i(n)) = \frac {(1+i(n))^{d(n, p)} \cdot i(n)} {(1+i(n))^{d(n, p)} - 1}
+
+* Duration :math:`d(n, p)` (number of years within the optimization horizon that investment annuities are accounted for)
+
+.. math::
+    d(n, p)=min\{year_{max} - year(p), l(n)\}
+
+* Lifetime limit :math:`limit_{end}(n, p)` (ensure fixed costs for investments are within optimization horizon)
+
+.. math::
+    limit_{end}(n, p)=min\{year_{max}, year(p) + l(n)\}
 
 Constraints of the core model
 +++++++++++++++++++++++++++++

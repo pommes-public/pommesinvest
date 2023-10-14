@@ -2,10 +2,10 @@ name: pommesinvest
 channels:
   - conda-forge
 dependencies:
-  - python=3.8
+  - python=3.9
   - pip
   - numpy
   - pandas
   - pip:
-      - oemof.solph==0.5.1dev1
+      - git+https://github.com/oemof/oemof-solph.git@feature/account-for-remaining-values-of-multi-period-investments
       - pyyaml
