@@ -952,7 +952,7 @@ def create_new_built_converters(
             ).to_numpy(),
             "min": t["min_load_factor"],
             "max": t["max_load_factor"],
-            "investment": solph.Investment(**invest_kwargs),
+            "nominal_value": solph.Investment(**invest_kwargs),
         }
 
         node_dict[i] = build_condensing_converter(
@@ -1044,7 +1044,7 @@ def create_new_built_converters_myopic_horizon(
             ).to_numpy(),
             "min": t["min"],
             "max": t["max"],
-            "investment": solph.Investment(
+            "nominal_value": solph.Investment(
                 maximum=invest_max,
                 # New built plants are installed at capacity costs for the start year
                 # (of each myopic iteration = investment possibility)
@@ -1507,7 +1507,7 @@ def create_new_built_storages(input_data, im, node_dict):
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
-                    investment=solph.Investment(**invest_kwargs["inflow"]),
+                    nominal_value=solph.Investment(**invest_kwargs["inflow"]),
                 )
             },
             outputs={
@@ -1519,7 +1519,7 @@ def create_new_built_storages(input_data, im, node_dict):
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
-                    investment=solph.Investment(**invest_kwargs["outflow"]),
+                    nominal_value=solph.Investment(**invest_kwargs["outflow"]),
                 )
             },
             loss_rate=s["loss_rate"],
@@ -1532,7 +1532,9 @@ def create_new_built_storages(input_data, im, node_dict):
             invest_relation_output_capacity=s[
                 "invest_relation_output_capacity"
             ],
-            investment=solph.Investment(**invest_kwargs["capacity"]),
+            nominal_storage_capacity=solph.Investment(
+                **invest_kwargs["capacity"]
+            ),
         )
 
     return node_dict
@@ -1649,7 +1651,7 @@ def create_new_built_storages_myopic_horizon(
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
-                    investment=solph.Investment(
+                    nominal_value=solph.Investment(
                         maximum=invest_max_pump,
                         ep_costs=economics.annuity(
                             capex=input_data["costs_storages_investment"].loc[
@@ -1670,7 +1672,7 @@ def create_new_built_storages_myopic_horizon(
                         ]
                     ).to_numpy(),
                     max=s["max_storage_level"],
-                    investment=solph.Investment(
+                    nominal_value=solph.Investment(
                         maximum=invest_max_turbine,
                         ep_costs=economics.annuity(
                             capex=input_data["costs_storages_investment"].loc[
@@ -1695,7 +1697,7 @@ def create_new_built_storages_myopic_horizon(
             invest_relation_output_capacity=s[
                 "invest_relation_output_capacity"
             ],
-            investment=solph.Investment(
+            nominal_storage_capacity=solph.Investment(
                 maximum=invest_max,
                 ep_costs=economics.annuity(
                     capex=input_data["costs_storages_investment"].loc[
