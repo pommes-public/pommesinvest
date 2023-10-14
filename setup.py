@@ -87,10 +87,10 @@ setup(
     install_requires=[
         "numpy",
         "pandas",
-        "git+https://github.com/oemof/oemof-solph.git@features/multi-period",
+        "git+https://github.com/oemof/oemof-solph.git@feature/account-for-remaining-values-of-multi-period-investments",
         "pyyaml",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     extras_require={
         "dev": ["pytest", "sphinx", "sphinx_rtd_theme", "sphinx_copybutton"]
     },

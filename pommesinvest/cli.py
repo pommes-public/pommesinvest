@@ -61,8 +61,8 @@ control_parameters:
 
 # 2) Set model optimization time and frequency
 time_parameters:
-    start_time: "2017-01-01 00:00:00"
-    end_time: "2017-01-02 23:00:00"
+    start_time: "2020-01-01 00:00:00"
+    end_time: "2020-12-30 23:00:00"
     freq: "1H"
 
 # 3) Set input and output data paths
