@@ -58,7 +58,7 @@ control_parameters:
 time_parameters:
     start_time: "2020-01-01 00:00:00"
     end_time: "2020-12-30 23:00:00"
-    freq: "1H"
+    freq: "24H"
 
 # 3) Set input and output data paths
 input_output_parameters:

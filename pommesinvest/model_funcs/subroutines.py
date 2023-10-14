@@ -5,9 +5,9 @@ General description
 This file contains all subroutines used for reading in input data
 for the investment variant of POMMES.
 
-Functions build_XX_transformer represent a hierarchical structure:
-    build_XX_transformer builds a single transformer element of a given type
-    and returns this to create_XX_transformers as node_dict[i], so the i_th
+Functions build_XX_converter represent a hierarchical structure:
+    build_XX_converter builds a single converter element of a given type
+    and returns this to create_XX_converters as node_dict[i], so the i_th
     element to be build
 
 @author: Johannes Kochems (*), Johannes Giehl (*), Yannick Werner,
@@ -134,10 +134,10 @@ def create_buses(input_data, node_dict):
     return node_dict
 
 
-def create_linking_transformers(input_data, im, node_dict):
-    r"""Create linking transformers and add them to the dict of nodes.
+def create_linking_converters(input_data, im, node_dict):
+    r"""Create linking converters and add them to the dict of nodes.
 
-    Linking transformers serve for modeling interconnector capacities
+    Linking converters serve for modeling interconnector capacities
 
     Parameters
     ----------
@@ -155,13 +155,13 @@ def create_linking_transformers(input_data, im, node_dict):
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Modified dictionary containing all nodes of the EnergySystem including
-        the interconnection transformers elements
+        the interconnection converters elements
     """
     # try and except statement since not all countries might be modeled
     for i, l in input_data["linking_transformers"].iterrows():
         try:
             if l["type"] == "DC":
-                node_dict[i] = solph.components.Transformer(
+                node_dict[i] = solph.components.Converter(
                     label=i,
                     inputs={
                         node_dict[l["from"]]: solph.Flow(
@@ -183,7 +183,7 @@ def create_linking_transformers(input_data, im, node_dict):
                 )
 
             if l["type"] == "AC":
-                node_dict[i] = solph.components.Transformer(
+                node_dict[i] = solph.components.Converter(
                     label=i,
                     inputs={
                         node_dict[l["from"]]: solph.Flow(
@@ -670,16 +670,16 @@ def create_excess_sinks(input_data, node_dict):
     return node_dict
 
 
-def build_condensing_transformer(i, t, node_dict, outflow_args_el):
-    r"""Build a regular condensing transformer
+def build_condensing_converter(i, t, node_dict, outflow_args_el):
+    r"""Build a regular condensing converter
 
     Parameters
     ----------
     i : :obj:`str`
-        label of current transformer (within iteration)
+        label of current converter (within iteration)
 
     t : :obj:`pd.Series`
-        pd.Series containing attributes for transformer component
+        pd.Series containing attributes for converter component
         (row-wise data entries)
 
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
@@ -690,11 +690,11 @@ def build_condensing_transformer(i, t, node_dict, outflow_args_el):
 
     Returns
     -------
-    node_dict[i] : `transformer <oemof.solph.components.Transformer>`
-        The transformer element to be added to the dict of nodes
+    node_dict[i] : `converter <oemof.solph.components.Converter>`
+        The converter element to be added to the dict of nodes
         as i-th element
     """
-    node_dict[i] = solph.components.Transformer(
+    node_dict[i] = solph.components.Converter(
         label=i,
         inputs={node_dict[t["from"]]: solph.flows.Flow()},
         outputs={node_dict[t["to_el"]]: solph.flows.Flow(**outflow_args_el)},
@@ -704,14 +704,14 @@ def build_condensing_transformer(i, t, node_dict, outflow_args_el):
     return node_dict[i]
 
 
-def create_exogenous_transformers(
+def create_exogenous_converters(
     input_data,
     im,
     node_dict,
 ):
-    """Create exogenous transformers and add them to the dict of nodes
+    """Create exogenous converters and add them to the dict of nodes
 
-    exogenous transformers (fleets) are created for which no investments
+    exogenous converters (fleets) are created for which no investments
     are considered and which are instead phased in / out by increasing / reducing
     capacities based on commissioning date / unit age
 
@@ -731,7 +731,7 @@ def create_exogenous_transformers(
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Modified dictionary containing all nodes of the EnergySystem including
-        the exogenous transformer elements
+        the exogenous converter elements
     """
     for i, t in input_data["exogenous_transformers"].iterrows():
         # HACK: Use annual capacity values and max timeseries
@@ -817,19 +817,19 @@ def create_exogenous_transformers(
             * multiplier
         )
 
-        node_dict[i] = build_condensing_transformer(
+        node_dict[i] = build_condensing_converter(
             i, t, node_dict, outflow_args_el
         )
 
     return node_dict
 
 
-def create_new_built_transformers(
+def create_new_built_converters(
     input_data,
     im,
     node_dict,
 ):
-    """Create new-built transformers and add them to the dict of nodes
+    """Create new-built converters and add them to the dict of nodes
 
     New built units are modelled as power plant fleets per energy carrier /
     technology.
@@ -850,7 +850,7 @@ def create_new_built_transformers(
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Modified dictionary containing all nodes of the EnergySystem including
-        the new-built transformer elements
+        the new-built converter elements
     """
     for i, t in input_data["new_built_transformers"].iterrows():
 
@@ -955,20 +955,20 @@ def create_new_built_transformers(
             "investment": solph.Investment(**invest_kwargs),
         }
 
-        node_dict[i] = build_condensing_transformer(
+        node_dict[i] = build_condensing_converter(
             i, t, node_dict, outflow_args_el
         )
 
     return node_dict
 
 
-def create_new_built_transformers_myopic_horizon(
+def create_new_built_converters_myopic_horizon(
     input_data,
     im,
     node_dict,
     iteration_results,
 ):
-    """Create new-built transformers and add them to the dict of nodes
+    """Create new-built converters and add them to the dict of nodes
 
     New built units are modelled as power plant fleets per energy carrier /
     technology.
@@ -993,17 +993,17 @@ def create_new_built_transformers_myopic_horizon(
     -------
     node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
         Modified dictionary containing all nodes of the EnergySystem including
-        the new-built transformer elements
+        the new-built converter elements
 
-    new_built_transformer_labels : list
-        Labels of new-built transformers
+    new_built_converter_labels : list
+        Labels of new-built converters
     """
     # Use a list to store capacities installed for new built alternatives
-    new_built_transformer_labels = []
+    new_built_converter_labels = []
 
     for i, t in input_data["new_built_transformers"].iterrows():
 
-        new_built_transformer_labels.append(i)
+        new_built_converter_labels.append(i)
 
         if not iteration_results["new_built_transformers"].empty:
             existing_capacity = iteration_results[
@@ -1061,11 +1061,11 @@ def create_new_built_transformers_myopic_horizon(
             ),
         }
 
-        node_dict[i] = build_condensing_transformer(
+        node_dict[i] = build_condensing_converter(
             i, t, node_dict, outflow_args_el
         )
 
-    return node_dict, new_built_transformer_labels
+    return node_dict, new_built_converter_labels
 
 
 def create_exogenous_storages(input_data, im, node_dict):
