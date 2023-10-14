@@ -121,14 +121,14 @@ oemof.solph components used (`see the oemof.solph.models module <https://github.
 
 with
 
-* Annuity :math:`A(c_{invest}(n, p), l(n), i(n))`:
+* Annuity :math:`A(c_{invest}(n, p), l(n), i(n))`
 
 .. math::
 
     A(c_{invest}(n, p), l(n), i(n)) = c_{invest}(n, p) \cdot
     \frac {(1+i(n))^{l(n)} \cdot i(n)} {(1+i(n))^{l(n)} - 1}
 
-* Discount factor :math:`DF`:
+* Discount factor :math:`DF`
 
 .. math::
     DF=(1+dr)
@@ -138,7 +138,7 @@ with
 .. math::
     ANF(d(n, p), i(n)) = \frac {(1+i(n))^{d(n, p)} \cdot i(n)} {(1+i(n))^{d(n, p)} - 1}
 
-* Duration :math:`d(n, p)` (number of years within the optimization horizon that investment annuities are accounted for):
+* Duration :math:`d(n, p)` (number of years within the optimization horizon that investment annuities are accounted for)
 
 .. math::
     d(n, p)=min\{year_{max} - year(p), l(n)\}
