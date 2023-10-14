@@ -94,9 +94,9 @@ Nomenclature
     ":math:`EL`", "P", "overall emission limit in :math:`t \space CO_2`"
     ":math:`EL(p)`", "P", "annual overall emission limit in :math:`t \space CO_2`"
     ":math:`d(n, p)`", "P", "| duration, i.e. number of years that annuities for investment
-    | into flow or node :math:`n` in period :math:`p` are accounted for"
+    | into flow or node :math:`n` occuring in period :math:`p` are accounted for"
     ":math:`year_{max}`", "P", "last year of the optimization horizon (end of last period)"
-    ":math:`ANF(d, i(n))`", "P", "annuity factor for duration :math:`d` and interest rate :math:`i(n)`"
+    ":math:`ANF(d(n, p), i(n))`", "P", "annuity factor for duration :math:`d(n, p)` and interest rate :math:`i(n)`"
     ":math:`limit_{end}(n, p)`", "P", "parameter ensuring fixed costs are within optimization horizon"
 
 
