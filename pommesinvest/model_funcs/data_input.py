@@ -37,6 +37,7 @@ from pommesinvest.model_funcs.subroutines import (
     create_shortage_sources,
     load_input_data,
     create_linking_converters,
+    create_electric_vehicles,
 )
 
 
@@ -193,6 +194,19 @@ def parse_input_data(im):
             f"sinks_demand_response_el_ava_neg_ts_"
             f"{im.demand_response_scenario}"
         )
+
+        # Electric vehicles
+        components[
+            "electric_vehicles"
+        ] = f"components_electric_vehicles_{im.demand_response_scenario}"
+        hourly_time_series[
+            "electric_vehicles_ts"
+        ] = f"electric_vehicles_ts_{im.demand_response_scenario}"
+        ev_buses = load_input_data(
+            filename=components["electric_vehicles"], im=im
+        )
+        ev_buses = list(ev_buses.loc[ev_buses["type"] == "bus"].index.values)
+        im.add_ev_buses(ev_buses)
 
     # Combine all files
     input_files = {
@@ -419,6 +433,7 @@ def add_components(input_data, im):
 
     if im.activate_demand_response:
         node_dict = create_demand_response_units(input_data, im, node_dict)
+        node_dict = create_electric_vehicles(input_data, im, node_dict)
 
     node_dict = create_excess_sinks(input_data, node_dict)
     node_dict = create_exogenous_converters(input_data, im, node_dict)

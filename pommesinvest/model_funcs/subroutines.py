@@ -1711,3 +1711,160 @@ def create_new_built_storages_myopic_horizon(
         )
 
     return node_dict, new_built_storage_labels
+
+
+def create_electric_vehicles(
+    input_data,
+    im,
+    node_dict,
+):
+    """Create electric vehicles and add them to the dict of nodes
+
+    Electric vehicles may be inflexible which is effectively a fixed electricity
+    demand or flexible which is effectively modelled as a battery with
+    time-dependent state of charge limits.
+
+    Parameters
+    ----------
+    input_data: :obj:`dict` of :class:`pd.DataFrame`
+        The input data given as a dict of DataFrames
+        with component names as keys
+
+    im : :class:`InvestmentModel`
+        The investment model that is considered
+
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Dictionary containing all nodes of the EnergySystem
+
+    Returns
+    -------
+    node_dict : :obj:`dict` of :class:`nodes <oemof.network.Node>`
+        Modified dictionary containing all nodes of the EnergySystem
+        including the electric vehicle elements
+    """
+    # Create ev bus first since this is required for other components
+    for i, c in input_data["electric_vehicles"].iterrows():
+        if c["type"] == "bus":
+            node_dict[i] = solph.buses.Bus(label=i)
+
+    for i, c in input_data["electric_vehicles"].iterrows():
+        component_type = c["type"]
+        if component_type == "transformer":
+            outflow_args = {
+                "nominal_value": c["nominal_value"],
+                "variable_costs": c["variable_costs"],
+            }
+            if "_uc" in i:
+                outflow_args["fix"] = (
+                    input_data["electric_vehicles_ts"]
+                    .loc[im.start_time : im.end_time, c["time_series"]]
+                    .to_numpy()
+                )
+                outflow_args["variable_costs"] = (
+                    input_data["costs_operation_storages_ts"].loc[
+                        im.start_time : im.end_time,
+                        f"storage_el_battery",
+                    ]
+                    * 2  # inflow and outflow!
+                ).to_numpy()
+            elif "_cc_bidirectional" in i:
+                outflow_args["max"] = (
+                    input_data["electric_vehicles_ts"].loc[
+                        im.start_time : im.end_time, c["time_series"]
+                    ]
+                ).to_numpy()
+            node_dict[i] = solph.components.Transformer(
+                label=i,
+                inputs={node_dict[c["from"]]: solph.flows.Flow()},
+                outputs={node_dict[c["to"]]: solph.flows.Flow(**outflow_args)},
+                conversion_factors={node_dict[c["to"]]: c["efficiency_el"]},
+            )
+        elif component_type == "bus":
+            pass  # has already been created
+        elif component_type == "storage":
+            node_dict[i] = solph.components.GenericStorage(
+                label=i,
+                inputs={
+                    node_dict[c["from"]]: solph.flows.Flow(
+                        nominal_value=c["inflow_power"],
+                        variable_costs=(
+                            input_data["costs_operation_storages_ts"].loc[
+                                im.start_time : im.end_time,
+                                f"storage_el_battery",
+                            ]
+                        ).to_numpy(),
+                        max=(
+                            input_data["electric_vehicles_ts"].loc[
+                                im.start_time : im.end_time,
+                                # cc avail; hack - list is rendered as string
+                                c["time_series"].split(",")[0][2:-1],
+                            ]
+                        ).to_numpy(),
+                    )
+                },
+                outputs={
+                    node_dict[c["to"]]: solph.flows.Flow(
+                        nominal_value=c["outflow_power"],
+                        variable_costs=(
+                            input_data["costs_operation_storages_ts"].loc[
+                                im.start_time : im.end_time,
+                                f"storage_el_battery",
+                            ]
+                        ).to_numpy(),
+                    )
+                },
+                nominal_storage_capacity=c["nominal_value"],
+                # storage level indexed in TIMEPOINTS
+                max_storage_level=(
+                    input_data["electric_vehicles_ts"]
+                    .loc[
+                        im.start_time : f"{int(im.end_time[:4])+1}"
+                        f"-01-01 00:00:00",
+                        # soc upper; hack - list is rendered as string
+                        c["time_series"].split(",")[2][2:-2],
+                    ]
+                    .to_numpy()
+                ),
+                min_storage_level=(
+                    input_data["electric_vehicles_ts"]
+                    .loc[
+                        im.start_time : f"{int(im.end_time[:4])+1}"
+                        f"-01-01 00:00:00",
+                        # soc lower; hack - list is rendered as string
+                        c["time_series"].split(",")[1][2:-1],
+                    ]
+                    .to_numpy()
+                ),
+                inflow_conversion_factor=c["efficiency_el"],
+                outflow_conversion_factor=c["efficiency_discharging_el"],
+                balanced=False,
+            )
+        elif component_type == "sink":
+            if "_uc" not in i:
+                node_dict[i] = solph.components.Sink(
+                    label=i,
+                    inputs={
+                        node_dict[c["from"]]: solph.flows.Flow(
+                            nominal_value=c["nominal_value"],
+                            fix=(
+                                input_data["electric_vehicles_ts"]
+                                .loc[
+                                    im.start_time : im.end_time,
+                                    c["time_series"],
+                                ]
+                                .to_numpy()
+                            ),
+                        )
+                    },
+                )
+            else:
+                node_dict[i] = solph.components.Sink(
+                    label=i, inputs={node_dict[c["from"]]: solph.flows.Flow()}
+                )
+
+        else:
+            raise ValueError(
+                f"Invalid electric vehicle component type: {component_type}."
+            )
+
+    return node_dict
