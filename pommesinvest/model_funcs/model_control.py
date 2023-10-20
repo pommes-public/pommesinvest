@@ -665,7 +665,7 @@ class InvestmentModel(object):
         emissions pathway limit can be imposed.
 
         Note that setting an emissions limit may conflict with high minimum
-        loads from conventional transformers.
+        loads from conventional converters.
         Be aware that this may lead to model infeasibility
         if commodity bus balances cannot be met.
 
@@ -799,8 +799,8 @@ class InvestmentModel(object):
     def build_myopic_horizon_model(self, counter, iteration_results):
         r"""Set up and return a myopic horizon LP dispatch model
 
-        Track the transformer and storage labels in order to obtain and pass
-        transformer and storage investments as well as initial storage levels
+        Track the converter and storage labels in order to obtain and pass
+        converter and storage investments as well as initial storage levels
         for each iteration. Set the end time of an iteration
         excluding the overlap to the start of the next iteration.
 
@@ -841,14 +841,14 @@ class InvestmentModel(object):
         (
             node_dict,
             emissions_limit,
-            transformer_and_storage_labels,
+            converter_and_storage_labels,
         ) = nodes_from_csv_myopic_horizon(self, iteration_results)
-        # Only set storage and transformer labels attribute for 0th iteration
-        if not hasattr(self, "transformer_and_storage_labels"):
+        # Only set storage and converter labels attribute for 0th iteration
+        if not hasattr(self, "converter_and_storage_labels"):
             setattr(
                 self,
-                "transformer_and_storage_labels",
-                transformer_and_storage_labels,
+                "converter_and_storage_labels",
+                converter_and_storage_labels,
             )
 
         # Update model start time for the next iteration
@@ -952,19 +952,19 @@ class InvestmentModel(object):
             )
 
         for i, s in iteration_results["new_built_tansformers"].iterrows():
-            transformer = solph.views.node(
+            converter = solph.views.node(
                 iteration_results["model_results"], i
             )
 
             # Increase capacity by results of each iteration
             iteration_results["new_built_tansformers"].at[
                 i, "existing_capacity"
-            ] += transformer["scalars"][((i, "DE_bus_el"), "invest")]
+            ] += converter["scalars"][((i, "DE_bus_el"), "invest")]
 
         if iteration_results["storages_exogenous"].empty:
             iteration_results["storages_exogenous"] = pd.DataFrame(
                 columns=["initial_storage_level_last_iteration"],
-                index=getattr(self, "transformer_and_storage_labels")[
+                index=getattr(self, "converter_and_storage_labels")[
                     "exogenous_storages"
                 ],
             )
@@ -986,7 +986,7 @@ class InvestmentModel(object):
                     "existing_outflow_power",
                     "existing_capacity_storage",
                 ],
-                index=getattr(self, "transformer_and_storage_labels")[
+                index=getattr(self, "converter_and_storage_labels")[
                     "new_built_storages"
                 ],
                 data=0,
@@ -1014,5 +1014,5 @@ class InvestmentModel(object):
             ] += storage["scalars"].loc[((i, "None"), "invest")]
 
         logging.info(
-            "Obtained initial (transformer and storage) levels for next iteration"
+            "Obtained initial (converter and storage) levels for next iteration"
         )

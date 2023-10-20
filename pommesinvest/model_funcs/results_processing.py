@@ -86,7 +86,7 @@ def filter_storage_results(results):
 def filter_european_country_results(im, results):
     """Filter values for European countries from dispatch results
 
-    Exclude dispatch for linking transformers. These are already accounted
+    Exclude dispatch for linking converters. These are already accounted
     for by considering the German electricity bus. Since transmission losses
     are neglected in favor of small transportation costs, flow values are equal.
 

@@ -28,15 +28,15 @@ from pommesinvest.model_funcs.subroutines import (
     create_excess_sinks,
     create_exogenous_storages,
     create_exogenous_storages_myopic_horizon,
-    create_exogenous_transformers,
+    create_exogenous_converters,
     create_new_built_storages,
     create_new_built_storages_myopic_horizon,
-    create_new_built_transformers,
-    create_new_built_transformers_myopic_horizon,
+    create_new_built_converters,
+    create_new_built_converters_myopic_horizon,
     create_renewables,
     create_shortage_sources,
     load_input_data,
-    create_linking_transformers,
+    create_linking_converters,
     create_electric_vehicles,
 )
 
@@ -293,7 +293,7 @@ def resample_input_data(input_data, im):
     im : :class:`InvestmentModel`
         The investment model that is considered
     """
-    transformer_data = ["exogenous_transformers", "new_built_transformers"]
+    converter_data = ["exogenous_transformers", "new_built_transformers"]
     storage_data = ["exogenous_storages_el", "new_built_storages_el"]
     annual_ts = [
         "transformers_exogenous_max_ts",
@@ -313,7 +313,7 @@ def resample_input_data(input_data, im):
         "linking_transformers_ts",
     ]
 
-    transformer_columns = [
+    converter_columns = [
         "grad_pos",
         "grad_neg",
         "max_load_factor",
@@ -361,9 +361,9 @@ def resample_input_data(input_data, im):
         annual_ts.append("emission_development_factors")
 
     for key in input_data.keys():
-        if key in transformer_data:
-            input_data[key].loc[:, transformer_columns] = (
-                input_data[key].loc[:, transformer_columns].mul(im.multiplier)
+        if key in converter_data:
+            input_data[key].loc[:, converter_columns] = (
+                input_data[key].loc[:, converter_columns].mul(im.multiplier)
             )
         elif key in storage_data:
             # Add additional columns for existing units and remove later on
@@ -404,7 +404,7 @@ def resample_input_data(input_data, im):
 def add_components(input_data, im):
     r"""Add the oemof components to a dictionary of nodes
 
-    Note: Storages and new-built transformers are not included here.
+    Note: Storages and new-built converters are not included here.
     They have to be defined separately since the approaches differ
     between myopic horizon and simple model.
 
@@ -426,7 +426,7 @@ def add_components(input_data, im):
     node_dict = create_buses(input_data, node_dict)
     node_dict = create_commodity_sources(input_data, im, node_dict)
     if im.countries != ["DE"]:
-        node_dict = create_linking_transformers(input_data, im, node_dict)
+        node_dict = create_linking_converters(input_data, im, node_dict)
     node_dict = create_shortage_sources(input_data, im, node_dict)
     node_dict = create_renewables(input_data, im, node_dict)
     node_dict = create_demand(input_data, im, node_dict)
@@ -436,7 +436,7 @@ def add_components(input_data, im):
         node_dict = create_electric_vehicles(input_data, im, node_dict)
 
     node_dict = create_excess_sinks(input_data, node_dict)
-    node_dict = create_exogenous_transformers(input_data, im, node_dict)
+    node_dict = create_exogenous_converters(input_data, im, node_dict)
 
     return node_dict
 
@@ -466,7 +466,7 @@ def nodes_from_csv(im):
 
     node_dict = add_components(input_data, im)
 
-    node_dict = create_new_built_transformers(input_data, im, node_dict)
+    node_dict = create_new_built_converters(input_data, im, node_dict)
     node_dict = create_exogenous_storages(input_data, im, node_dict)
     node_dict = create_new_built_storages(input_data, im, node_dict)
 
@@ -507,8 +507,8 @@ def nodes_from_csv_myopic_horizon(im, iteration_results):
     emissions_limit : int or None
         The overall emissions limit
 
-    transformer_and_storage_labels : :obj:`dict`
-        dictionary containing the labels of all transformers and storages elements
+    converter_and_storage_labels : :obj:`dict`
+        dictionary containing the labels of all converters and storages elements
         included in the model used for assessing these
         and assigning initial states
     """
@@ -533,11 +533,11 @@ def nodes_from_csv_myopic_horizon(im, iteration_results):
 
     node_dict = add_components(input_data, im)
 
-    # create storages and new-built transformers (myopic horizon)
+    # create storages and new-built converters (myopic horizon)
     (
         node_dict,
-        new_built_transformer_labels,
-    ) = create_new_built_transformers_myopic_horizon(
+        new_built_converter_labels,
+    ) = create_new_built_converters_myopic_horizon(
         input_data, im, node_dict, iteration_results
     )
 
@@ -554,8 +554,8 @@ def nodes_from_csv_myopic_horizon(im, iteration_results):
         input_data, im, node_dict, iteration_results
     )
 
-    transformer_and_storage_labels = {
-        "new_built_tranformers": new_built_transformer_labels,
+    converter_and_storage_labels = {
+        "new_built_tranformers": new_built_converter_labels,
         "exogenous_storages": exogenous_storage_labels,
         "new_built_storages": new_built_storage_labels,
     }
@@ -568,4 +568,4 @@ def nodes_from_csv_myopic_horizon(im, iteration_results):
             im.end_time,
         )
 
-    return node_dict, emissions_limit, transformer_and_storage_labels
+    return node_dict, emissions_limit, converter_and_storage_labels
