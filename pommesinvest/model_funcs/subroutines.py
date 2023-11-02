@@ -10,7 +10,7 @@ Functions build_XX_converter represent a hierarchical structure:
     and returns this to create_XX_converters as node_dict[i], so the i_th
     element to be build
 
-@author: Johannes Kochems (*), Johannes Giehl (*), Yannick Werner,
+@author: Johannes Kochems (*), Johannes Giehl, Yannick Werner,
 Benjamin Grosse
 
 Contributors:
@@ -18,7 +18,7 @@ Julien Faist, Hannes Kachel, Sophie Westphal, Flora von Mikulicz-Radecki,
 Carla Spiller, Fabian Büllesbach, Timona Ghosh, Paul Verwiebe,
 Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 
-(*) Corresponding authors
+(*) Corresponding author
 """
 
 # Import necessary packages for function definitions
