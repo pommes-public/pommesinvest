@@ -38,7 +38,7 @@ Installation requirements
 -------------------------
 See `environments.yml` file
 
-@author: Johannes Kochems (*), Johannes Giehl (*), Yannick Werner,
+@author: Johannes Kochems (*), Johannes Giehl, Yannick Werner,
 Benjamin Grosse
 
 Contributors:
@@ -46,7 +46,7 @@ Julien Faist, Hannes Kachel, Sophie Westphal, Flora von Mikulicz-Radecki,
 Carla Spiller, Fabian Büllesbach, Timona Ghosh, Paul Verwiebe,
 Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
 
-(*) Corresponding authors
+(*) Corresponding author
 """
 import argparse
 import logging
@@ -73,7 +73,7 @@ def run_investment_model(config_file="./config.yml"):
     """
     Run a pommesinvest model.
 
-    Read in config information from a yaml file, initialize and run a
+    Read in config information from a yaml file, initialize and run an
     investment model and process results.
 
     Parameters
@@ -121,13 +121,6 @@ def run_investment_model(config_file="./config.yml"):
     if not im.myopic_horizon:
         im.build_simple_model()
 
-        if im.extract_duals:
-            im.om.receive_duals()
-            logging.info(
-                "Obtaining dual values and reduced costs from the model\n"
-                "in order to calculate power prices."
-            )
-
         if im.write_lp_file:
             im.om.write(
                 f"{im.path_folder_output}pommesinvest_model.lp",
@@ -159,6 +152,23 @@ def run_investment_model(config_file="./config.yml"):
             im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
 
         if im.extract_duals:
+            logging.info(
+                "Rerunning model with fixed investment results in order to "
+                "obtain dual values and reduced costs from the model.\n"
+                "Dual values of energy balance will be "
+                "interpreted as power prices."
+            )
+            im.om.fix_investments()
+            im.om.receive_duals()
+            if im.solver_commandline_options:
+                im.om.solve(
+                    solver=im.solver,
+                    solve_kwargs={"tee": True},
+                    cmdline_options=config["solver_cmdline_options"],
+                )
+            else:
+                im.om.solve(solver=im.solver, solve_kwargs={"tee": True})
+
             power_prices = im.get_power_prices_from_duals()
 
         meta_results = processing.meta_results(im.om)
