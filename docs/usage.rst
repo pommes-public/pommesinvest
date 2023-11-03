@@ -174,7 +174,6 @@ Pay attention to the allowed values for the string values:
         solver_commandline_options: False
         solver_tmp_dir: "default" # absolute or relative path; standard: "default"
         fuel_cost_pathway: "NZE"
-        fuel_price_shock: "high"
         emissions_cost_pathway: "long-term"
         flexibility_options_scenario: "50"
         activate_emissions_budget_limit: False

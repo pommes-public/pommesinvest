@@ -124,17 +124,6 @@ class InvestmentModel(object):
             | commodity prices from 1991-2020", "| compared to IEA's scenarios,
             | close to upper range of projections"
 
-    fuel_price_shock : str
-        The extend to which the Ukraine war price shock is assumed to
-        influence near-term future fuel price development
-
-        .. csv-table:: Price shocks and explanations
-            :header: "price shock", "explanation"
-            :widths: 20, 80
-
-            "high", "price peaks in 2026 and remains high until around 2030"
-            "low", "price quickly stabilizes and reaches pre-war levels by 2026"
-
     emissions_cost_pathway : str
         A predefined pathway for emissions cost development until 2030 or 2050
 
@@ -348,7 +337,6 @@ class InvestmentModel(object):
         self.solver_commandline_options = None
         self.solver_tmp_dir = None
         self.fuel_cost_pathway = None
-        self.fuel_price_shock = None
         self.emissions_cost_pathway = None
         self.flexibility_options_scenario = None
         self.activate_emissions_budget_limit = None
@@ -578,7 +566,7 @@ class InvestmentModel(object):
             f"investment_LP_start-{self.start_time[:10]}_"
             f"{self.optimization_timeframe}-years_{rh}_freq_{self.freq}_"
             f"{dr}_{self.demand_response_scenario}_"
-            f"fuel_price-{self.fuel_cost_pathway}_{self.fuel_price_shock}_"
+            f"fuel_price-{self.fuel_cost_pathway}_"
             f"co2_price-{self.emissions_cost_pathway}{maxima}"
         )
         if self.sensitivity_parameter != "None":

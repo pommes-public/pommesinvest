@@ -90,8 +90,7 @@ def parse_input_data(im):
     annual_time_series = {
         "transformers_exogenous_max_ts": "transformers_exogenous_max_ts",
         "costs_fuel_ts": (
-            f"costs_fuel_{im.fuel_cost_pathway}"
-            + f"_{im.fuel_price_shock}_nominal_indexed_ts"
+            f"costs_fuel_{im.fuel_cost_pathway}_nominal_indexed_ts"
         ),
         "costs_emissions_ts": (
             f"costs_emissions_{im.emissions_cost_pathway}_nominal_indexed_ts"
