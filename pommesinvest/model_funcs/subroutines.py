@@ -288,17 +288,26 @@ def create_shortage_sources(input_data, im, node_dict):
         )
     if im.include_artificial_shortage_units:
         for i, s in input_data["sources_shortage_el_artificial"].iterrows():
+            # Hack: hydrogen costs only defined for Germany
+            if s["fuel"] == "hydrogen":
+                variable_costs_entry = "DE_source_hydrogen"
+            else:
+                variable_costs_entry = f"{s['country']}_source_{s['fuel']}"
             node_dict[i] = solph.components.Source(
                 label=i,
                 outputs={
                     node_dict[s["to"]]: solph.flows.Flow(
+                        nominal_value=s["nominal_value"],
+                        max=input_data[
+                            "sources_shortage_el_artificial_ts"
+                        ].loc[im.start_time : im.end_time, i],
                         variable_costs=(
                             s["costs_markup_factor"]
                             / s["efficiency_el"]
                             * input_data["costs_fuel_ts"]
                             .loc[
                                 im.start_time : im.end_time,
-                                f"{s['country']}_source_{s['fuel']}",
+                                variable_costs_entry,
                             ]
                             .to_numpy()
                         ),

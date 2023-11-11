@@ -79,14 +79,6 @@ def parse_input_data(im):
         "linking_transformers_ts": "linking_transformers_ts",
     }
 
-    if im.include_artificial_shortage_units:
-        components[
-            "sources_shortage_el_artificial"
-        ] = f"sources_el_artificial_{im.demand_response_scenario}"
-        hourly_time_series[
-            "sources_shortage_el_artificial_ts"
-        ] = f"sources_el_artificial_ts_{im.demand_response_scenario}"
-
     annual_time_series = {
         "transformers_exogenous_max_ts": "transformers_exogenous_max_ts",
         "costs_fuel_ts": (
@@ -119,6 +111,14 @@ def parse_input_data(im):
         "linking_transformers_annual_ts": "linking_transformers_annual_ts",
         "storages_el_exogenous_max_ts": "storages_el_exogenous_max_ts",
     }
+
+    if im.include_artificial_shortage_units:
+        components[
+            "sources_shortage_el_artificial"
+        ] = f"sources_el_artificial_{im.demand_response_scenario}"
+        annual_time_series[
+            "sources_shortage_el_artificial_ts"
+        ] = f"sources_el_artificial_ts_{im.demand_response_scenario}"
 
     # Time-invariant data sets
     other_files = {
@@ -354,6 +354,10 @@ def resample_input_data(input_data, im):
             "regeneration_duration",
             "shifting_duration",
         ]
+
+    # Artificial shortage units
+    if im.include_artificial_shortage_units:
+        annual_ts.append("sources_shortage_el_artificial_ts")
 
     # Development factors for emissions; used for scaling minimum loads
     if im.activate_emissions_pathway_limit:
