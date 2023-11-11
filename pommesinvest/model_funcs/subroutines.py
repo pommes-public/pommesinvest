@@ -292,13 +292,16 @@ def create_shortage_sources(input_data, im, node_dict):
                 label=i,
                 outputs={
                     node_dict[s["to"]]: solph.flows.Flow(
-                        variable_costs=s["shortage_costs"],
-                        fix=np.array(
-                            input_data["sources_shortage_el_artificial_ts"][i][
-                                im.start_time : im.end_time
+                        variable_costs=(
+                            s["costs_markup_factor"]
+                            / s["efficiency_el"]
+                            * input_data["costs_fuel_ts"]
+                            .loc[
+                                im.start_time : im.end_time,
+                                f"{s['country']}_source_{s['fuel']}",
                             ]
+                            .to_numpy()
                         ),
-                        nominal_value=s["maximum"],
                     ),
                 },
             )
