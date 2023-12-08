@@ -158,7 +158,7 @@ def run_investment_model(config_file="./config.yml"):
                 "Dual values of energy balance will be "
                 "interpreted as power prices."
             )
-            im.om.fix_investments()
+            im.om.fix_investments(rounding_precision=3)
             im.om.receive_duals()
             if im.solver_commandline_options:
                 im.om.solve(
