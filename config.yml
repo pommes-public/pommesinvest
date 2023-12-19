@@ -50,7 +50,7 @@ control_parameters:
     extract_duals: True
     extract_other_countries_production: True
     results_rounding_precision: 2
-    sensitivity_parameter: "None"  # "None", "pv", "prices", "consumption"
+    sensitivity_parameter: "None"  # "None", "pv", "prices", "interconnection"
     sensitivity_value: "None"  # "None", "-50%", "-25%", "+25%", "+50%"
 
 # 2) Set model optimization time and frequency
