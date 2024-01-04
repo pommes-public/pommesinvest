@@ -246,9 +246,9 @@ def update_sensitivities(im, input_files):
     sensitivities = {
         "pv": "sources_renewables_ts",
         "prices": ["costs_fuel_ts", "costs_emissions_ts"],
-        "consumption": "sinks_demand_el",
+        "interconnection": "linking_transformers",
     }
-    if im.sensitivity_parameter not in ["pv", "prices", "consumption"]:
+    if im.sensitivity_parameter not in ["pv", "prices", "interconnection"]:
         raise ValueError(
             f"Invalid configuration given. 'sensitivity_parameter' "
             f"{im.sensitivity_parameter} is not implemented."
