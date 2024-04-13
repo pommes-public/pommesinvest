@@ -5,15 +5,7 @@ General description
 This file contains all function definitions for reading in input data
 used for the investment variant of POMMES.
 
-@author: Johannes Kochems (*), Johannes Giehl (*), Yannick Werner,
-Benjamin Grosse
-
-Contributors:
-Julien Faist, Hannes Kachel, Sophie Westphal, Flora von Mikulicz-Radecki,
-Carla Spiller, Fabian Büllesbach, Timona Ghosh, Paul Verwiebe,
-Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
-
-(*) Corresponding authors
+@author: Johannes Kochems, Yannick Werner
 """
 
 import numpy as np

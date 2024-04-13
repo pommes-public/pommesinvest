@@ -22,19 +22,29 @@ def get_version(rel_path):
 __author__ = [
     "Johannes Kochems",
     "Yannick Werner",
-    "Johannes Giehl",
-    "Benjamin Grosse",
 ]
-__copyright__ = "Copyright 2023 pommes developer group"
+__copyright__ = "Copyright 2024 pommes developer group"
 __credits__ = [
+    "Benjamin Grosse",
+    "Carla Spiller",
+    "Christian Fraatz",
+    "Conrad Nicklisch",
+    "Daniel Peschel",
+    "Dr. Johannes Giehl",
+    "Dr. Paul Verwiebe",
+    "Fabian Büllesbach",
     "Sophie Westphal",
     "Flora von Mikulicz-Radecki",
-    "Carla Spiller",
-    "Fabian Büllesbach",
-    "Timona Ghosh",
-    "Paul Verwiebe",
+    "Florian Maurer",
+    "Hannes Kachel",
+    "Julian Endres",
+    "Julien Faist",
     "Leticia Encinas Rosa",
-    "Joachim Müller-Kirchenbauer",
+    "Carla Spiller",
+    "Prof. Dr.-Ing. Joachim Müller-Kirchenbauer",
+    "Robin Claus",
+    "Sophie Westphal",
+    "Timona Ghosh"
 ]
 
 __license__ = "MIT"

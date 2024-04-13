@@ -93,34 +93,45 @@ Every kind of contribution or feedback is warmly welcome.<br>
 We use the [GitHub issue management](https://github.com/pommes-public/pommesinvest/issues) as well as 
 [pull requests](https://github.com/pommes-public/pommesinvest/pulls) for collaboration. We try to stick to the PEP8 coding standards.
 
-The following people have contributed in the following manner to `pommesinvest`:
+### Authors
+* Authors of `pommesinvest` are Johannes Kochems and Yannick Werner. It is maintained by Johannes Kochems.
+* All people mentioned below contributed to early-stage versions or predecessors of POMMES or ideally supported it.
 
-| Name | Contribution | Status |
-| ---- | ---- | ---- |
-| Johannes Kochems | major development & conceptualization<br>conceptualization, core functionality (esp. dispatch, power prices, demand response, rolling horizon modeling), architecture, publishing process | coordinator & maintainer,<br>developer & corresponding author |
-| Yannick Werner | major development & conceptualization<br>conceptualization, core functionality (esp. exchange, RES, CHP modeling), interface to pommesdata  | developer & corresponding author |
-| Johannes Giehl | development<br>early-stage core functionality | developer |
-| Benjamin Grosse | development<br>support for conceptualization, early-stage contributions at the interface to pommesdata | developer |
-| Sophie Westphal | development<br>early-stage contributions at the interface to pommesdata | former developer (student assistant) |
-| Flora von Mikulicz-Radecki | testing<br>early-stage comprehensive testing | former tester (student assistant) |
-| Carla Spiller | development<br>early-stage rolling horizon and cross-border exchange integration | former developer (student assistant) |
-| Fabian Büllesbach | development<br>early-stage rolling horizon implementation | former developer (master's student) |
-| Timona Ghosh | development<br>early-stage cross-border exchange implementation | former developer (master's student) |
-| Paul Verwiebe | support<br>support of early-stage core functionality development | former supporter (research associate) |
-| Leticia Encinas Rosa | support<br>support of early-stage core functionality development | former supporter (research associate) |
-| Joachim Müller-Kirchenbauer | support & conceptualization<br>early-stage conceptualization, funding | supporter (university professor) |
+### List of contributors to POMMES
+The following people have contributed to *POMMES*.
+Most of these contributions belong to early-stage versions and are not part
+of the actual source code. Nonetheless, all contributions shall be acknowledged and the full list is provided for transparency reasons.
 
-*Note: Not every single contribution is reflected in the current version of
-`pommesinvest`. This is especially true for those marked as early-stage 
-contributions that may have been extended, altered or sometimes discarded. 
-Nonetheless, all people listed have made valuable contributions. The ones
-discarded might be re-integrated at some point in time.
-Dedicated contributions to `pommesdata` and `pommesdispatch` are not included
-in the list, but listed individually for these projects.*
+The main contributors are stated on top, the remainder
+is listed in alphabetical order.
+
+| Name                                       | Contribution                                                                                                                                                                                                                                                                                         |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Johannes Kochems                           | major development & conceptualization<br>conceptualization, development of all investment-related parts; development of main data preparation routines (esp. future projection for all components, RES tender data and LCOE estimates, documentation), architecture, publishing process, maintenance |
+| Yannick Werner                             | major development & conceptualization<br>conceptualization, development of main data preparation routines (status quo data for all components, detailed RES, interconnector and hydro data), architecture                                                                                            |
+| Benjamin Grosse                            | data collection for conventional power plants in early development stage, ideal support and conceptionel counseling                                                                                                                                                                                  |
+| Carla Spiller                              | data collection for conventional power plants in early stage development as an input to *pommesdata*; co-development of rolling horizon dispatch modelling in predecessor of *pommesdispatch*                                                                                                        |
+| Christian Fraatz                           | data collection for conventional power plants in early stage development as an input to *pommesdata*                                                                                                                                                                                                 |
+| Conrad Nicklisch                           | data collection for RES in early stage development as an input to *pommesdata*                                                                                                                                                                                                                       |
+| Daniel Peschel                             | data collection on CHP power plants as an input to *pommesdata*                                                                                                                                                                                                                                      |
+| Dr. Johannes Giehl                         | conceptionel support and research of data licensing; conceptionel support for investment modelling in *pommesinvest*                                                                                                                                                                                 |
+| Dr. Paul Verwiebe                          | development of small test models as a predecessor of POMMES                                                                                                                                                                                                                                          |
+| Fabian Büllesbach                          | development of a predecessor of the rolling horizon modeling approach in *pommesdispatch*                                                                                                                                                                                                            |
+| Flora von Mikulicz-Radecki                 | extensive code and functionality testing in an early development stage for predecessors of *pommesdispatch* and *pommesinvest*                                                                                                                                                                       |
+| Florian Maurer                             | support with / fix for python dependencies                                                                                                                                                                                                                                                           |
+| Hannes Kachel                              | development and analysis of approaches for complexity reduction in a predecessor of *pommesinvest*                                                                                                                                                                                                   |
+| Julian Endres                              | data collection for costs and conventional power plants in early stage development                                                                                                                                                                                                                   |
+| Julien Faist                               | data collection for original coal power plant shutdown and planned installation of new power plants for *pommesdata*; co-development of a predecessor of *pommesinvest*                                                                                                                              |
+| Leticia Encinas Rosa                       | ata collection for conventional power plants in early stage development as an input to *pommesdata*                                                                                                                                                                                                  |
+| Prof. Dr.-Ing. Joachim Müller-Kirchenbauer | funding, enabling and conceptual support                                                                                                                                                                                                                                                             |
+| Robin Claus                                | data collection for RES in early stage development as an input to *pommesdata*                                                                                                                                                                                                                       |
+| Sophie Westphal                            | data collection for costs and conventional power plants in early stage development as an input for *pommesdata*                                                                                                                                                                                      |
+| Timona Ghosh                               | data collection for interconnector data as an input to *pommesdata*                                                                                                                                                                                                                                  |
+
 
 ## Citing
 If you are using `pommesinvest` for your own analyses, we recommend citing as:<br>
-*Kochems, J.; Werner, Y.; Giehl, J.; Grosse, B. et al. (2021): pommesinvest. A bottom-up fundamental power market model for the German electricity sector. https://github.com/pommes-public/pommesinvest, accessed YYYY-MM-DD.*
+*Kochems, J. and Werner, Y. (2024): pommesinvest. A bottom-up fundamental power market model for the German electricity sector. https://github.com/pommes-public/pommesinvest, accessed YYYY-MM-DD.*
 
 We furthermore recommend naming the version tag or the commit hash used for the sake of transparency and reproducibility.
 
@@ -129,7 +140,7 @@ Also see the *CITATION.cff* file for citation information.
 ## License
 This software is licensed under MIT License.
 
-Copyright 2021 pommes developer group
+Copyright 2024 pommes developer group
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
