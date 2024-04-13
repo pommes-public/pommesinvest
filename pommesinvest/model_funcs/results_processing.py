@@ -1,3 +1,15 @@
+# -*- coding: utf-8 -*-
+"""
+General description
+-------------------
+These are processing routines used in the power market model POMMES.
+
+Installation requirements
+-------------------------
+Python version >= 3.8
+
+@author: Johannes Kochems
+"""
 import pandas as pd
 from oemof.solph import views
 

@@ -38,15 +38,7 @@ Installation requirements
 -------------------------
 See `environments.yml` file
 
-@author: Johannes Kochems (*), Johannes Giehl (*), Yannick Werner,
-Benjamin Grosse
-
-Contributors:
-Julien Faist, Hannes Kachel, Sophie Westphal, Flora von Mikulicz-Radecki,
-Carla Spiller, Fabian Büllesbach, Timona Ghosh, Paul Verwiebe,
-Leticia Encinas Rosa, Joachim Müller-Kirchenbauer
-
-(*) Corresponding authors
+@author: Johannes Kochems
 """
 import argparse
 import logging
