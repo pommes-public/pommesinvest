@@ -3,38 +3,8 @@ authors:
   - family-names: Kochems
     given-names: Johannes
     orcid: "https://orcid.org/0000-0002-3461-3679"
-  - family-names: Giehl
-    given-names: Johannes
-    orcid: "https://orcid.org/0000-0002-1769-1907"
-  - family-names: Werner
-    given-names: Yannick
-    orcid: "https://orcid.org/0000-0002-6674-805X"
-  - family-names: Grosse
-    given-names: Benjamin
-    orcid: "https://orcid.org/0000-0002-3323-9734"
-  - family-names: Faist
-    given-names: Julien
-  - family-names: Kachel
-    given-names: Hannes
-  - family-names: Westphal
-    given-names: Sophie
-  - family-names: "Mikulicz-Radecki"
-    given-names: Flora
-  - family-names: Spiller
-    given-names: Carla
-  - family-names: "Büllesbach"
-    given-names: Fabian
-  - family-names: Ghosh
-    given-names: Timona
-  - family-names: Verwiebe
-    given-names: Paul
-    orcid: "https://orcid.org/0000-0002-6877-2846"
-  - family-names: "Encinas-Rosa"
-    given-names: Leticia
-  - family-names: "Müller-Kirchenbauer"
-    given-names: Joachim
-cff-version: "1.1.0"
-date-released: 2022-XX-XX
+cff-version: "1.2.0"
+date-released: 2024-04-13
 doi: https://doi.org/
 keywords: 
   - "multi-period model"
